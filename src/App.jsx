@@ -13,6 +13,8 @@ import CreateMatchPage from "./pages/CreateMatchPage";
 function App() {
   return (
     <Routes>
+      <Route path="/" element={<Navigate to="/players" />} />
+
       <Route path="/players" element={<Players />} />
       <Route path="/teams" element={<Teams />} />
       <Route path="/teamlistpage" element={<TeamListPage />} />
