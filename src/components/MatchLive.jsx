@@ -26,9 +26,18 @@ export default function MatchLive({ matchId, teamsMap }) {
 
     const setsToWin = Math.ceil(match.totalSets / 2);
 
+    // ✅ NEW: set validation rule
+    const isSetValid = pointsA >= 15 || pointsB >= 15;
+
     // Add completed set
     const addSet = async () => {
         if (match.status === "finished") return;
+
+        // ✅ SAFETY CHECK (prevents 0-0 bug)
+        if (!isSetValid) {
+            alert("At least one team must score 15 points to record a set");
+            return;
+        }
 
         let updatedTeamAScore = match.teamAScore;
         let updatedTeamBScore = match.teamBScore;
@@ -110,7 +119,7 @@ export default function MatchLive({ matchId, teamsMap }) {
                         </button>
                         <button
                             disabled={match.status === "finished"}
-                            onClick={() => setPointsA(Math.max(0, pointsA + 1))}
+                            onClick={() => setPointsA(pointsA + 1)}
                             className={`px-4 py-2 rounded-lg text-white
                                 ${match.status === "finished"
                                     ? "bg-gray-400 cursor-not-allowed"
@@ -140,7 +149,7 @@ export default function MatchLive({ matchId, teamsMap }) {
                         </button>
                         <button
                             disabled={match.status === "finished"}
-                            onClick={() => setPointsB(Math.max(0, pointsB + 1))}
+                            onClick={() => setPointsB(pointsB + 1)}
                             className={`px-4 py-2 rounded-lg text-white
                                 ${match.status === "finished"
                                     ? "bg-gray-400 cursor-not-allowed"
@@ -155,12 +164,26 @@ export default function MatchLive({ matchId, teamsMap }) {
 
             {/* Add Set Button */}
             {match.status === "live" && (
-                <button
-                    onClick={addSet}
-                    className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                    Add Set Score
-                </button>
+                <>
+                    <button
+                        onClick={addSet}
+                        disabled={!isSetValid}
+                        className={`w-full py-2 rounded-lg text-white
+                            ${isSetValid
+                                ? "bg-blue-600 hover:bg-blue-700"
+                                : "bg-gray-300 cursor-not-allowed"
+                            }
+                        `}
+                    >
+                        Add Set Score
+                    </button>
+
+                    {!isSetValid && (
+                        <p className="text-xs text-red-500 text-center">
+                            One team must reach at least 15 points to save a set
+                        </p>
+                    )}
+                </>
             )}
 
             {/* Set History */}

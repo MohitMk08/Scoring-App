@@ -1,8 +1,6 @@
-// src/pages/tournaments/UpcomingTournamentView.jsx
-
 import React from "react";
 
-const UpcomingTournamentView = ({ tournament }) => {
+const UpcomingTournamentView = ({ tournament, teams }) => {
     if (!tournament) return null;
 
     return (
@@ -33,7 +31,7 @@ const UpcomingTournamentView = ({ tournament }) => {
                 <div>
                     <p className="text-xs text-gray-500">Participating Teams</p>
                     <p className="font-medium">
-                        {tournament.teams?.length || 0} Teams
+                        {teams.length || 0} Teams
                     </p>
                 </div>
             </div>

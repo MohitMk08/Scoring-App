@@ -9,11 +9,13 @@ import CreateTournament from "./pages/tournaments/CreateTournament"
 import TournamentDetailsPage from "./pages/tournaments/TournamentDetailsPage";
 import EditTournament from "./pages/EditTournament";
 import CreateMatchPage from "./pages/CreateMatchPage";
+import Home from "./pages/Home";
 
 function App() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/players" />} />
+      {/* Default route */}
+      <Route path="/" element={<Home />} />
 
       <Route path="/players" element={<Players />} />
       <Route path="/teams" element={<Teams />} />
@@ -25,8 +27,9 @@ function App() {
       <Route path="/tournaments/:id" element={<TournamentDetailsPage />} />
       <Route path="/tournaments/:id/create-match" element={<CreateMatchPage />} />
       <Route path="/tournaments/:id/edit" element={<EditTournament />} />
-      {/* Redirect unknown paths to /players */}
-      <Route path="*" element={<Navigate to="/players" />} />
+
+      {/* ❌ Catch-all → redirect to home */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
