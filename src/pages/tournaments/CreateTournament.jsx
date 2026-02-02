@@ -15,6 +15,9 @@ const CreateTournament = () => {
     const navigate = useNavigate();
 
     const [name, setName] = useState("");
+    const [rules, setRules] = useState("");
+    const [location, setLocation] = useState("");
+
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
 
@@ -23,7 +26,7 @@ const CreateTournament = () => {
 
     const [loading, setLoading] = useState(false);
 
-    // 🔹 Fetch all teams (not attached to tournament yet)
+    // 🔹 Fetch all teams
     useEffect(() => {
         const fetchTeams = async () => {
             const snap = await getDocs(collection(db, "teams"));
@@ -64,6 +67,8 @@ const CreateTournament = () => {
             // 1️⃣ Create tournament
             const tournamentRef = await addDoc(collection(db, "tournaments"), {
                 name,
+                rules: rules || "",
+                location: location || "",
                 startDate: startDate
                     ? Timestamp.fromDate(new Date(startDate))
                     : null,
@@ -76,7 +81,7 @@ const CreateTournament = () => {
 
             const tournamentId = tournamentRef.id;
 
-            // 2️⃣ Attach teams to tournament (CRITICAL STEP)
+            // 2️⃣ Attach teams to tournament
             for (const team of selectedTeams) {
                 await updateDoc(doc(db, "teams", team.id), {
                     tournamentId,
@@ -112,6 +117,34 @@ const CreateTournament = () => {
                     />
                 </div>
 
+                {/* Rules */}
+                <div>
+                    <label className="block text-sm font-medium mb-1">
+                        Tournament Rules / Details
+                    </label>
+                    <textarea
+                        value={rules}
+                        onChange={(e) => setRules(e.target.value)}
+                        rows={4}
+                        className="w-full border rounded-lg px-3 py-2"
+                        placeholder="Enter rules, format, or notes"
+                    />
+                </div>
+
+                {/* Location */}
+                <div>
+                    <label className="block text-sm font-medium mb-1">
+                        Tournament Location / Venue
+                    </label>
+                    <input
+                        type="text"
+                        value={location}
+                        onChange={(e) => setLocation(e.target.value)}
+                        className="w-full border rounded-lg px-3 py-2"
+                        placeholder="e.g. City Stadium, Mumbai"
+                    />
+                </div>
+
                 {/* Dates */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
@@ -140,7 +173,7 @@ const CreateTournament = () => {
                 </div>
 
                 {/* Team Selection */}
-                <div>
+                <div className="mb-4">
                     <h2 className="text-sm font-medium mb-2">
                         Select Teams ({selectedTeams.length})
                     </h2>
@@ -168,9 +201,9 @@ const CreateTournament = () => {
                                         <p className="font-medium text-sm">
                                             {team.name}
                                         </p>
-                                        <p className="text-xs text-gray-500">
-                                            Players: {team.players?.length || 0}
-                                        </p>
+                                        {/* <p className="text-xs text-gray-500">
+                                            Players: —
+                                        </p> */}
                                     </div>
                                 );
                             })}

@@ -23,17 +23,15 @@ const TournamentListPage = () => {
     const navigate = useNavigate();
 
     useEffect(() => {
-        const unsub = onSnapshot(
-            collection(db, "tournaments"),
-            (snap) => {
-                const data = snap.docs.map((d) => ({
-                    id: d.id,
-                    ...d.data(),
-                }));
-                setTournaments(data);
-            }
-        );
+        const unsub = onSnapshot(collection(db, "tournaments"), (snap) => {
+            const data = snap.docs.map((d) => ({
+                id: d.id,
+                ...d.data(),
+            }));
+            setTournaments(data);
+        });
 
+        // keep countdown ticking
         const timer = setInterval(() => {
             forceTick((t) => t + 1);
         }, 1000);
@@ -45,7 +43,6 @@ const TournamentListPage = () => {
     }, []);
 
     return (
-
         <div className="p-4 max-w-6xl mx-auto">
             <DashboardLayout>
                 <h1 className="text-xl font-semibold mb-4">
@@ -62,16 +59,11 @@ const TournamentListPage = () => {
                             const startDate = t.startDate?.toDate();
                             const endDate = t.endDate?.toDate();
 
-                            let derivedStatus = "upcoming";
-                            if (t.isCompleted) derivedStatus = "completed";
-                            else if (
-                                startDate <= new Date() &&
-                                endDate >= new Date()
-                            )
-                                derivedStatus = "ongoing";
+                            // ✅ SOURCE OF TRUTH
+                            const status = t.status || "upcoming";
 
                             const countdown =
-                                derivedStatus === "upcoming"
+                                status === "upcoming" && startDate
                                     ? getCountdown(startDate)
                                     : null;
 
@@ -90,14 +82,14 @@ const TournamentListPage = () => {
 
                                     {/* STATUS BADGE */}
                                     <span
-                                        className={`inline-block mt-1 px-2 py-1 rounded-full text-xs font-medium ${derivedStatus === "upcoming"
+                                        className={`inline-block mt-1 px-2 py-1 rounded-full text-xs font-medium ${status === "upcoming"
                                             ? "bg-blue-100 text-blue-700"
-                                            : derivedStatus === "ongoing"
+                                            : status === "ongoing"
                                                 ? "bg-red-100 text-red-700"
                                                 : "bg-green-100 text-green-700"
                                             }`}
                                     >
-                                        {derivedStatus.toUpperCase()}
+                                        {status.toUpperCase()}
                                     </span>
 
                                     {/* DATES */}
@@ -118,14 +110,14 @@ const TournamentListPage = () => {
                                     )}
 
                                     {/* ONGOING */}
-                                    {derivedStatus === "ongoing" && (
+                                    {status === "ongoing" && (
                                         <div className="mt-3 text-sm text-red-600 font-semibold">
                                             🔴 Live Now
                                         </div>
                                     )}
 
                                     {/* COMPLETED */}
-                                    {derivedStatus === "completed" && (
+                                    {status === "completed" && (
                                         <div className="mt-3 text-sm text-green-700 font-medium">
                                             🏆 Winner:{" "}
                                             {t.winnerTeamName || "—"}

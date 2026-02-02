@@ -12,6 +12,16 @@ import { db } from "../../firebase";
 const OngoingTournamentView = ({ tournament, teams }) => {
     const [matches, setMatches] = useState([]);
     const [generating, setGenerating] = useState(false);
+    const getMapUrl = (location) => {
+        if (!location) return null;
+        const encoded = encodeURIComponent(location);
+        return `https://maps.googleapis.com/maps/api/staticmap?center=${encoded}&zoom=14&size=600x300&markers=color:red|${encoded}`;
+    };
+    const mapUrl = getMapUrl(tournament.location);
+
+
+    // ✅ HARD GUARD — source of truth
+    if (!tournament || tournament.status !== "ongoing") return null;
 
     // 🔹 Fetch matches for this tournament
     useEffect(() => {
@@ -31,12 +41,18 @@ const OngoingTournamentView = ({ tournament, teams }) => {
         });
 
         return () => unsub();
-    }, [tournament]);
+    }, [tournament?.id]);
 
     // 🔹 Generate matches
     const generateMatches = async () => {
         if (teams.length < 2) {
             alert("At least 2 teams are required");
+            return;
+        }
+
+        // ✅ Prevent duplicate generation
+        if (matches.length > 0) {
+            alert("Matches already generated");
             return;
         }
 
@@ -73,6 +89,17 @@ const OngoingTournamentView = ({ tournament, teams }) => {
 
     return (
         <div className="space-y-4">
+            {mapUrl && (
+                <div className="rounded-xl overflow-hidden border">
+                    <img
+                        src={mapUrl}
+                        alt="Tournament Location Map"
+                        className="w-full h-48 object-cover"
+                    />
+                </div>
+            )}
+
+
             {/* Generate Matches Button */}
             {matches.length === 0 && teams.length >= 2 && (
                 <button

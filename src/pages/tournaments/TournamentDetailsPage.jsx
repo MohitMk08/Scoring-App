@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
+import DashboardLayout from "../../layout/DashboardLayout";
 import {
     doc,
     getDoc,
@@ -7,6 +8,7 @@ import {
     query,
     where,
     onSnapshot,
+    updateDoc,
 } from "firebase/firestore";
 import { db } from "../../firebase";
 
@@ -21,7 +23,7 @@ const TournamentDetailsPage = () => {
     const [teams, setTeams] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    // Fetch tournament
+    // 🔹 Fetch tournament
     useEffect(() => {
         const fetchTournament = async () => {
             const snap = await getDoc(doc(db, "tournaments", id));
@@ -34,7 +36,7 @@ const TournamentDetailsPage = () => {
         fetchTournament();
     }, [id]);
 
-    // Fetch teams linked to tournament
+    // 🔹 Fetch teams linked to tournament
     useEffect(() => {
         if (!id) return;
 
@@ -54,45 +56,51 @@ const TournamentDetailsPage = () => {
         return () => unsub();
     }, [id]);
 
+    // ✅ FIX: Auto-sync tournament status (upcoming / ongoing / completed)
+    useEffect(() => {
+        if (!tournament?.startDate || !tournament?.endDate) return;
+
+        const now = new Date();
+        const start = tournament.startDate.toDate();
+        const end = tournament.endDate.toDate();
+
+        let newStatus = tournament.status;
+
+        if (now < start) newStatus = "upcoming";
+        else if (now >= start && now <= end) newStatus = "ongoing";
+        else if (now > end) newStatus = "completed";
+
+        // Update only if status actually changed
+        if (newStatus !== tournament.status) {
+            updateDoc(doc(db, "tournaments", tournament.id), {
+                status: newStatus,
+            });
+        }
+    }, [tournament]);
+
     if (loading) return <p className="p-4">Loading...</p>;
     if (!tournament) return <p className="p-4">Tournament not found</p>;
 
     return (
-        <div className="p-4 sm:p-6 space-y-5 max-w-4xl mx-auto">
-            {/* Header */}
-            <div className="bg-white rounded-xl p-4 sm:p-5 shadow-sm border border-gray-100">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div>
-                        <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">
-                            {tournament.name}
-                        </h1>
+        <div className="p-4 space-y-4 max-w-4xl mx-auto">
+            <DashboardLayout>
+                {/* Header */}
+                <div className="bg-white rounded-lg p-4 shadow-sm">
+                    <h1 className="text-xl font-semibold">{tournament.name}</h1>
 
-                        <p className="text-sm text-gray-500 mt-1">
-                            Participating Teams:{" "}
-                            <span className="font-medium text-gray-800">
-                                {teams.length}
-                            </span>
-                        </p>
-                    </div>
+                    <p className="text-sm text-gray-500 mt-1">
+                        Status:{" "}
+                        <span className="capitalize font-medium">
+                            {tournament.status}
+                        </span>
+                    </p>
 
-                    {/* Status Badge */}
-                    <span
-                        className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium capitalize
-              ${tournament.status === "ongoing"
-                                ? "bg-emerald-100 text-emerald-700"
-                                : tournament.status === "upcoming"
-                                    ? "bg-amber-100 text-amber-700"
-                                    : "bg-gray-200 text-gray-700"
-                            }
-            `}
-                    >
-                        {tournament.status}
-                    </span>
+                    <p className="text-sm text-gray-500 mt-1">
+                        Participating Teams: {teams.length}
+                    </p>
                 </div>
-            </div>
 
-            {/* Views */}
-            <div className="space-y-4">
+                {/* Views */}
                 {tournament.status === "upcoming" && (
                     <UpcomingTournamentView
                         tournament={tournament}
@@ -110,7 +118,7 @@ const TournamentDetailsPage = () => {
                 {tournament.status === "completed" && (
                     <CompletedTournamentView tournament={tournament} />
                 )}
-            </div>
+            </DashboardLayout>
         </div>
     );
 };
