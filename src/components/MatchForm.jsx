@@ -35,17 +35,21 @@ export default function MatchForm({ onMatchCreated }) {
 
         setLoading(true);
         try {
-            const docRef = await addDoc(collection(db, "matches"), {
-                teamAId: teamA,
-                teamBId: teamB,
-                teamAScore: 0,
-                teamBScore: 0,
-                setScores: [],
-                totalSets,
-                status: "live",
-                winnerTeamId: null,
-                createdAt: new Date()
-            });
+            const docRef = // When creating a match for tournament
+                await addDoc(collection(db, "matches"), {
+                    tournamentId: tournament.id, // crucial to link
+                    teamAId: teams[i].id,
+                    teamAName: teams[i].name,
+                    teamBId: teams[i + 1]?.id || null,
+                    teamBName: teams[i + 1]?.name || "BYE",
+                    round: 1, // you can calculate round dynamically if needed
+                    totalSets: 3,
+                    currentSet: 0,
+                    sets: [],
+                    status: "upcoming",
+                    createdAt: serverTimestamp(),
+                });
+
             onMatchCreated && onMatchCreated(docRef.id);
             setTeamA(""); setTeamB("");
         } catch (err) {

@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import DashboardLayout from "../../layout/DashboardLayout";
 import {
     doc,
     getDoc,
@@ -8,13 +7,13 @@ import {
     query,
     where,
     onSnapshot,
-    updateDoc,
 } from "firebase/firestore";
 import { db } from "../../firebase";
 
 import OngoingTournamentView from "../../components/tournaments/OngoingTournamentView";
 import UpcomingTournamentView from "../../components/tournaments/UpcomingTournamentView";
 import CompletedTournamentView from "../../components/tournaments/CompletedTournamentView";
+import DashboardLayout from "../../layout/DashboardLayout";
 
 const TournamentDetailsPage = () => {
     const { id } = useParams();
@@ -36,7 +35,7 @@ const TournamentDetailsPage = () => {
         fetchTournament();
     }, [id]);
 
-    // 🔹 Fetch teams linked to tournament
+    // 🔹 Fetch teams
     useEffect(() => {
         if (!id) return;
 
@@ -46,52 +45,56 @@ const TournamentDetailsPage = () => {
         );
 
         const unsub = onSnapshot(q, (snap) => {
-            const data = snap.docs.map((d) => ({
-                id: d.id,
-                ...d.data(),
-            }));
-            setTeams(data);
+            setTeams(
+                snap.docs.map((d) => ({
+                    id: d.id,
+                    ...d.data(),
+                }))
+            );
         });
 
         return () => unsub();
     }, [id]);
 
-    // ✅ FIX: Auto-sync tournament status (upcoming / ongoing / completed)
-    useEffect(() => {
-        if (!tournament?.startDate || !tournament?.endDate) return;
+    if (loading) {
+        return (
+            <DashboardLayout>
+                <p className="p-4">Loading tournament...</p>
+            </DashboardLayout>
+        );
+    }
 
-        const now = new Date();
-        const start = tournament.startDate.toDate();
-        const end = tournament.endDate.toDate();
+    if (!tournament) {
+        return (
+            <DashboardLayout>
+                <p className="p-4">Tournament not found</p>
+            </DashboardLayout>
+        );
+    }
 
-        let newStatus = tournament.status;
+    // ✅ SINGLE SOURCE OF TRUTH (CRITICAL FIX)
+    const startDate = tournament.startDate?.toDate();
+    const endDate = tournament.endDate?.toDate();
+    const now = new Date();
 
-        if (now < start) newStatus = "upcoming";
-        else if (now >= start && now <= end) newStatus = "ongoing";
-        else if (now > end) newStatus = "completed";
-
-        // Update only if status actually changed
-        if (newStatus !== tournament.status) {
-            updateDoc(doc(db, "tournaments", tournament.id), {
-                status: newStatus,
-            });
-        }
-    }, [tournament]);
-
-    if (loading) return <p className="p-4">Loading...</p>;
-    if (!tournament) return <p className="p-4">Tournament not found</p>;
+    let derivedStatus = "upcoming";
+    if (tournament.isCompleted) derivedStatus = "completed";
+    else if (startDate && endDate && startDate <= now && endDate >= now)
+        derivedStatus = "ongoing";
 
     return (
-        <div className="p-4 space-y-4 max-w-4xl mx-auto">
-            <DashboardLayout>
+        <DashboardLayout>
+            <div className="p-4 space-y-4 max-w-4xl mx-auto">
                 {/* Header */}
                 <div className="bg-white rounded-lg p-4 shadow-sm">
-                    <h1 className="text-xl font-semibold">{tournament.name}</h1>
+                    <h1 className="text-xl font-semibold">
+                        {tournament.name}
+                    </h1>
 
                     <p className="text-sm text-gray-500 mt-1">
                         Status:{" "}
                         <span className="capitalize font-medium">
-                            {tournament.status}
+                            {derivedStatus}
                         </span>
                     </p>
 
@@ -101,25 +104,27 @@ const TournamentDetailsPage = () => {
                 </div>
 
                 {/* Views */}
-                {tournament.status === "upcoming" && (
+                {derivedStatus === "upcoming" && (
                     <UpcomingTournamentView
                         tournament={tournament}
                         teams={teams}
                     />
                 )}
 
-                {tournament.status === "ongoing" && (
+                {derivedStatus === "ongoing" && (
                     <OngoingTournamentView
-                        tournament={tournament}
+                        tournament={{ ...tournament, status: "ongoing" }}
                         teams={teams}
                     />
                 )}
 
-                {tournament.status === "completed" && (
-                    <CompletedTournamentView tournament={tournament} />
+                {derivedStatus === "completed" && (
+                    <CompletedTournamentView
+                        tournament={tournament}
+                    />
                 )}
-            </DashboardLayout>
-        </div>
+            </div>
+        </DashboardLayout>
     );
 };
 

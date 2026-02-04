@@ -8,22 +8,26 @@ import {
     serverTimestamp,
 } from "firebase/firestore";
 import { db } from "../../firebase";
+import { useNavigate } from "react-router-dom";
 
 const OngoingTournamentView = ({ tournament, teams }) => {
+    const navigate = useNavigate();
+
     const [matches, setMatches] = useState([]);
     const [generating, setGenerating] = useState(false);
+
     const getMapUrl = (location) => {
         if (!location) return null;
         const encoded = encodeURIComponent(location);
         return `https://maps.googleapis.com/maps/api/staticmap?center=${encoded}&zoom=14&size=600x300&markers=color:red|${encoded}`;
     };
+
     const mapUrl = getMapUrl(tournament.location);
 
-
-    // ✅ HARD GUARD — source of truth
+    // ✅ HARD GUARD
     if (!tournament || tournament.status !== "ongoing") return null;
 
-    // 🔹 Fetch matches for this tournament
+    // 🔹 Fetch matches
     useEffect(() => {
         if (!tournament?.id) return;
 
@@ -33,11 +37,9 @@ const OngoingTournamentView = ({ tournament, teams }) => {
         );
 
         const unsub = onSnapshot(q, (snap) => {
-            const data = snap.docs.map((d) => ({
-                id: d.id,
-                ...d.data(),
-            }));
-            setMatches(data);
+            setMatches(
+                snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+            );
         });
 
         return () => unsub();
@@ -50,7 +52,6 @@ const OngoingTournamentView = ({ tournament, teams }) => {
             return;
         }
 
-        // ✅ Prevent duplicate generation
         if (matches.length > 0) {
             alert("Matches already generated");
             return;
@@ -66,14 +67,23 @@ const OngoingTournamentView = ({ tournament, teams }) => {
                     tournamentId: tournament.id,
                     round: 1,
                     matchNumber,
+
                     teamAId: teams[i].id,
                     teamAName: teams[i].name,
                     teamBId: teams[i + 1]?.id || null,
                     teamBName: teams[i + 1]?.name || "BYE",
+
                     status: "upcoming",
+
+                    // 🔴 REQUIRED FOR LIVE MATCH
+                    totalSets: 3,
+                    currentSet: null,
+                    sets: [],
+
                     teamAScore: 0,
                     teamBScore: 0,
                     winnerTeamId: null,
+
                     createdAt: serverTimestamp(),
                 });
 
@@ -99,8 +109,6 @@ const OngoingTournamentView = ({ tournament, teams }) => {
                 </div>
             )}
 
-
-            {/* Generate Matches Button */}
             {matches.length === 0 && teams.length >= 2 && (
                 <button
                     onClick={generateMatches}
@@ -117,7 +125,6 @@ const OngoingTournamentView = ({ tournament, teams }) => {
                 </p>
             )}
 
-            {/* Match List */}
             {matches.length === 0 ? (
                 <p className="text-sm text-gray-500 text-center">
                     No matches created yet.
@@ -145,7 +152,12 @@ const OngoingTournamentView = ({ tournament, teams }) => {
                             </p>
 
                             {match.status === "upcoming" && (
-                                <button className="mt-2 text-sm text-blue-600">
+                                <button
+                                    onClick={() =>
+                                        navigate(`/matches/live/${match.id}`)
+                                    }
+                                    className="mt-2 text-sm text-blue-600"
+                                >
                                     Start Match
                                 </button>
                             )}

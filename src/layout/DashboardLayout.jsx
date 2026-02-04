@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, Link } from "react-router-dom";
 
 export default function DashboardLayout({ children }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -13,7 +13,11 @@ export default function DashboardLayout({ children }) {
             >
                 {/* Sidebar header */}
                 <div className="p-4 flex justify-between items-center border-b">
-                    <h2 className="text-lg font-bold text-blue-600">VolleyScorer</h2>
+                    <Link to="/">
+                        {/* <img src={logo} className="App-logo" alt="logo" /> */}
+                        <h2 className="text-lg font-bold text-blue-600">VolleyScorer</h2>
+                    </Link>
+
                     <button
                         className="sm:hidden text-xl"
                         onClick={() => setSidebarOpen(false)}

@@ -10,6 +10,7 @@ import TournamentDetailsPage from "./pages/tournaments/TournamentDetailsPage";
 import EditTournament from "./pages/EditTournament";
 import CreateMatchPage from "./pages/CreateMatchPage";
 import Home from "./pages/Home";
+import MatchLivePage from "./pages/matches/MatchLivePage";
 
 function App() {
   return (
@@ -27,6 +28,7 @@ function App() {
       <Route path="/tournaments/:id" element={<TournamentDetailsPage />} />
       <Route path="/tournaments/:id/create-match" element={<CreateMatchPage />} />
       <Route path="/tournaments/:id/edit" element={<EditTournament />} />
+      <Route path="/matches/live/:matchId" element={<MatchLivePage />} />
 
       {/* ❌ Catch-all → redirect to home */}
       <Route path="*" element={<Navigate to="/" replace />} />
