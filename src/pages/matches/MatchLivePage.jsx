@@ -3,7 +3,8 @@ import {
     doc,
     onSnapshot,
     updateDoc,
-    Timestamp
+    Timestamp,
+    increment
 } from "firebase/firestore";
 import { db } from "../../firebase";
 import { useParams, useNavigate } from "react-router-dom";
@@ -58,26 +59,52 @@ const MatchLivePage = () => {
             const aSets = sets.filter(s => s.teamA > s.teamB).length;
             const bSets = sets.filter(s => s.teamB > s.teamA).length;
 
+            // MATCH FINISHED
             if (aSets === neededSets || bSets === neededSets) {
+                const winnerId = aSets > bSets ? match.teamAId : match.teamBId;
+                const loserId = aSets > bSets ? match.teamBId : match.teamAId;
+
+                // 1️⃣ Finish match
                 await updateDoc(doc(db, "matches", matchId), {
                     sets,
                     status: "finished",
-                    winnerTeamId:
-                        aSets > bSets ? match.teamAId : match.teamBId,
-                    finishedAt: Timestamp.now()
+                    winnerTeamId: winnerId,
+                    finishedAt: Timestamp.now(),
                 });
+
+                // 2️⃣ Update leaderboard stats (ONCE) winner update
+                await updateDoc(doc(db, "teams", winnerId), {
+                    played: increment(1),
+                    wins: increment(1),
+                    points: increment(2),
+                    setsWon: increment(aSets),
+                    setsLost: increment(bSets),
+                });
+
+                // looser update
+                await updateDoc(doc(db, "teams", loserId), {
+                    played: increment(1),
+                    losses: increment(1),
+                    setsWon: increment(bSets),
+                    setsLost: increment(aSets),
+                });
+
+
                 return;
             }
 
+            // NEXT SET
             sets.push({ teamA: 0, teamB: 0 });
 
             await updateDoc(doc(db, "matches", matchId), {
                 sets,
-                currentSet: match.currentSet + 1
+                currentSet: match.currentSet + 1,
             });
+
             return;
         }
 
+        // NORMAL POINT UPDATE
         await updateDoc(doc(db, "matches", matchId), { sets });
     };
 
@@ -106,11 +133,13 @@ const MatchLivePage = () => {
                 <h1 className="text-xl font-bold text-red-500">Live Match</h1>
 
                 {match.status === "upcoming" && (
-                    <><div className="flex justify-between text-lg font-semibold">
-                        <span>{match.teamAName}</span>
-                        <span>Set {match.currentSet || 1}</span>
-                        <span>{match.teamBName}</span>
-                    </div>
+                    <>
+                        <div className="flex justify-between text-lg font-semibold">
+                            <span>{match.teamAName}</span>
+                            <span>Set 1</span>
+                            <span>{match.teamBName}</span>
+                        </div>
+
                         <button
                             onClick={startMatch}
                             className="w-full bg-green-600 text-white py-2 rounded-lg"
@@ -155,12 +184,14 @@ const MatchLivePage = () => {
                 )}
 
                 {match.status === "live" && (
-                    <><button
-                        onClick={undoLastPoint}
-                        className="w-full py-2 bg-yellow-500 text-white rounded-lg"
-                    >
-                        Undo Last Point
-                    </button>
+                    <>
+                        <button
+                            onClick={undoLastPoint}
+                            className="w-full py-2 bg-yellow-500 text-white rounded-lg"
+                        >
+                            Undo Last Point
+                        </button>
+
                         <div className="space-y-2 mt-4">
                             <h3 className="font-semibold text-sm">Set History</h3>
 
@@ -175,7 +206,6 @@ const MatchLivePage = () => {
                             ))}
                         </div>
                     </>
-
                 )}
 
                 {match.status === "finished" && (
@@ -204,7 +234,6 @@ const MatchLivePage = () => {
                         >
                             Back to Tournament
                         </button>
-
                     </>
                 )}
             </div>

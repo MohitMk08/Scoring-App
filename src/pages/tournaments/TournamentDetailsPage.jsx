@@ -13,6 +13,8 @@ import { db } from "../../firebase";
 import OngoingTournamentView from "../../components/tournaments/OngoingTournamentView";
 import UpcomingTournamentView from "../../components/tournaments/UpcomingTournamentView";
 import CompletedTournamentView from "../../components/tournaments/CompletedTournamentView";
+import TournamentLeaderboard from "../../components/tournaments/TournamentLeaderboard";
+
 import DashboardLayout from "../../layout/DashboardLayout";
 
 const TournamentDetailsPage = () => {
@@ -102,6 +104,18 @@ const TournamentDetailsPage = () => {
                         Participating Teams: {teams.length}
                     </p>
                 </div>
+                {/* Tournamnent Leaderboard view */}
+                {derivedStatus === "ongoing" && (
+                    <>
+                        <TournamentLeaderboard tournamentId={id} />
+
+                        <OngoingTournamentView
+                            tournament={{ ...tournament, status: "ongoing" }}
+                            teams={teams}
+                        />
+                    </>
+                )}
+
 
                 {/* Views */}
                 {derivedStatus === "upcoming" && (

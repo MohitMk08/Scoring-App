@@ -6,13 +6,16 @@ import {
     updateDoc,
     doc,
     Timestamp,
+    setDoc
 } from "firebase/firestore";
 import { db } from "../../firebase";
 import { useNavigate } from "react-router-dom";
 import DashboardLayout from "../../layout/DashboardLayout";
+import { createMatches } from "../../utils/createMatches";
 
 const CreateTournament = () => {
     const navigate = useNavigate();
+    const [format, setFormat] = useState("round-robin");
 
     const [name, setName] = useState("");
     const [rules, setRules] = useState("");
@@ -25,6 +28,7 @@ const CreateTournament = () => {
     const [selectedTeams, setSelectedTeams] = useState([]);
 
     const [loading, setLoading] = useState(false);
+
 
     // 🔹 Fetch all teams
     useEffect(() => {
@@ -76,12 +80,30 @@ const CreateTournament = () => {
                     ? Timestamp.fromDate(new Date(endDate))
                     : null,
                 status: "upcoming",
+                format: format || "round-robin",
                 createdAt: Timestamp.now(),
             });
 
             const tournamentId = tournamentRef.id;
 
-            // 2️⃣ Attach teams to tournament
+            // 2️⃣ Create tournament teams (SUBCOLLECTION)
+            for (const team of selectedTeams) {
+                await setDoc(
+                    doc(db, "tournaments", tournamentId, "teams", team.id),
+                    {
+                        name: team.name,
+                        played: 0,
+                        wins: 0,
+                        losses: 0,
+                        points: 0,
+                    }
+                );
+            }
+
+            // 3️⃣ ✅ CREATE MATCHES (THIS IS THE LINE YOU ASKED ABOUT)
+            await createMatches(tournamentId, selectedTeams, format);
+
+            // 4️⃣ Attach tournamentId to teams (optional but ok)
             for (const team of selectedTeams) {
                 await updateDoc(doc(db, "teams", team.id), {
                     tournamentId,
@@ -90,6 +112,7 @@ const CreateTournament = () => {
 
             alert("Tournament created successfully");
             navigate(`/tournaments/${tournamentId}`);
+
         } catch (error) {
             console.error("Error creating tournament:", error);
             alert("Something went wrong");
@@ -97,6 +120,45 @@ const CreateTournament = () => {
             setLoading(false);
         }
     };
+
+
+    // matches creation as per format
+
+    const createMatches = async (tournamentId, teams, format) => {
+        if (format === "round-robin") {
+            for (let i = 0; i < teams.length; i++) {
+                for (let j = i + 1; j < teams.length; j++) {
+                    await addDoc(collection(db, "matches"), {
+                        tournamentId,
+                        teamAId: teams[i].id,
+                        teamAName: teams[i].name,
+                        teamBId: teams[j].id,
+                        teamBName: teams[j].name,
+                        status: "upcoming",
+                        createdAt: Timestamp.now(),
+                    });
+                }
+            }
+        }
+
+        if (format === "knockout") {
+            for (let i = 0; i < teams.length; i += 2) {
+                if (!teams[i + 1]) break;
+
+                await addDoc(collection(db, "matches"), {
+                    tournamentId,
+                    teamAId: teams[i].id,
+                    teamAName: teams[i].name,
+                    teamBId: teams[i + 1].id,
+                    teamBName: teams[i + 1].name,
+                    status: "upcoming",
+                    round: 1,
+                    createdAt: Timestamp.now(),
+                });
+            }
+        }
+    };
+
 
     return (
         <div className="max-w-3xl mx-auto p-4 space-y-6">
@@ -116,6 +178,19 @@ const CreateTournament = () => {
                         placeholder="Enter tournament name"
                     />
                 </div>
+                {/* Type */}
+                <div>
+                    <select
+                        value={format}
+                        onChange={(e) => setFormat(e.target.value)}
+                        className="w-full border rounded-lg px-3 p-2 my-2"
+                    >
+                        <option value="round-robin">Round Robin</option>
+                        <option value="double-round-robin">Double Round Robin</option>
+                        <option value="knockout">Knockout</option>
+                    </select>
+
+                </div>
 
                 {/* Rules */}
                 <div>
@@ -132,7 +207,7 @@ const CreateTournament = () => {
                 </div>
 
                 {/* Location */}
-                <div>
+                {/* <div>
                     <label className="block text-sm font-medium mb-1">
                         Tournament Location / Venue
                     </label>
@@ -143,7 +218,7 @@ const CreateTournament = () => {
                         className="w-full border rounded-lg px-3 py-2"
                         placeholder="e.g. City Stadium, Mumbai"
                     />
-                </div>
+                </div> */}
 
                 {/* Dates */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -27,6 +27,25 @@ const OngoingTournamentView = ({ tournament, teams }) => {
     // ✅ HARD GUARD
     if (!tournament || tournament.status !== "ongoing") return null;
 
+    useEffect(() => {
+        const q = query(
+            collection(db, "matches"),
+            where("tournamentId", "==", tournament.id)
+        );
+
+        const unsub = onSnapshot(q, (snap) => {
+            setMatches(
+                snap.docs.map(d => ({
+                    id: d.id,
+                    ...d.data(),
+                }))
+            );
+        });
+
+        return () => unsub();
+    }, [tournament.id]);
+
+
     // 🔹 Fetch matches
     useEffect(() => {
         if (!tournament?.id) return;
@@ -131,39 +150,34 @@ const OngoingTournamentView = ({ tournament, teams }) => {
                 </p>
             ) : (
                 <div className="space-y-3">
-                    {matches.map((match) => (
+                    {matches.map((m) => (
                         <div
-                            key={match.id}
-                            className="bg-white border rounded-lg p-3"
+                            key={m.id}
+                            className="border rounded-lg p-3 bg-white shadow-sm"
                         >
-                            <p className="text-sm font-semibold">
-                                {match.teamAName} vs {match.teamBName}
-                            </p>
+                            <div className="flex justify-between font-medium">
+                                <span>{m.teamAName}</span>
+                                <span>vs</span>
+                                <span>{m.teamBName}</span>
+                            </div>
 
-                            <p className="text-xs text-gray-500">
-                                Round {match.round} • Match {match.matchNumber}
-                            </p>
-
-                            <p className="text-xs mt-1">
-                                Status:{" "}
-                                <span className="font-medium capitalize">
-                                    {match.status}
-                                </span>
-                            </p>
-
-                            {match.status === "upcoming" && (
-                                <button
-                                    onClick={() =>
-                                        navigate(`/matches/live/${match.id}`)
-                                    }
-                                    className="mt-2 text-sm text-blue-600"
-                                >
-                                    Start Match
-                                </button>
+                            {m.status === "finished" ? (
+                                <div className="text-sm mt-2 text-green-700">
+                                    Winner:{" "}
+                                    {m.winnerTeamId === m.teamAId
+                                        ? m.teamAName
+                                        : m.teamBName}
+                                </div>
+                            ) : (
+                                <div className="text-sm mt-2 text-gray-500">
+                                    Status: {m.status}
+                                </div>
                             )}
                         </div>
                     ))}
+
                 </div>
+
             )}
         </div>
     );
