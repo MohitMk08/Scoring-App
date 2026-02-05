@@ -14,7 +14,7 @@ const OngoingTournamentView = ({ tournament, teams }) => {
     const navigate = useNavigate();
 
     const [matches, setMatches] = useState([]);
-    const [generating, setGenerating] = useState(false);
+    // const [generating, setGenerating] = useState(false);
 
     const getMapUrl = (location) => {
         if (!location) return null;
@@ -27,7 +27,11 @@ const OngoingTournamentView = ({ tournament, teams }) => {
     // ✅ HARD GUARD
     if (!tournament || tournament.status !== "ongoing") return null;
 
+
+    // 🔹 Fetch matches
     useEffect(() => {
+        if (!tournament?.id) return;
+
         const q = query(
             collection(db, "matches"),
             where("tournamentId", "==", tournament.id)
@@ -43,78 +47,8 @@ const OngoingTournamentView = ({ tournament, teams }) => {
         });
 
         return () => unsub();
-    }, [tournament.id]);
-
-
-    // 🔹 Fetch matches
-    useEffect(() => {
-        if (!tournament?.id) return;
-
-        const q = query(
-            collection(db, "matches"),
-            where("tournamentId", "==", tournament.id)
-        );
-
-        const unsub = onSnapshot(q, (snap) => {
-            setMatches(
-                snap.docs.map((d) => ({ id: d.id, ...d.data() }))
-            );
-        });
-
-        return () => unsub();
     }, [tournament?.id]);
 
-    // 🔹 Generate matches
-    const generateMatches = async () => {
-        if (teams.length < 2) {
-            alert("At least 2 teams are required");
-            return;
-        }
-
-        if (matches.length > 0) {
-            alert("Matches already generated");
-            return;
-        }
-
-        setGenerating(true);
-
-        try {
-            let matchNumber = 1;
-
-            for (let i = 0; i < teams.length; i += 2) {
-                await addDoc(collection(db, "matches"), {
-                    tournamentId: tournament.id,
-                    round: 1,
-                    matchNumber,
-
-                    teamAId: teams[i].id,
-                    teamAName: teams[i].name,
-                    teamBId: teams[i + 1]?.id || null,
-                    teamBName: teams[i + 1]?.name || "BYE",
-
-                    status: "upcoming",
-
-                    // 🔴 REQUIRED FOR LIVE MATCH
-                    totalSets: 3,
-                    currentSet: null,
-                    sets: [],
-
-                    teamAScore: 0,
-                    teamBScore: 0,
-                    winnerTeamId: null,
-
-                    createdAt: serverTimestamp(),
-                });
-
-                matchNumber++;
-            }
-        } catch (err) {
-            console.error(err);
-            alert("Error generating matches");
-        } finally {
-            setGenerating(false);
-        }
-    };
 
     return (
         <div className="space-y-4">
@@ -128,21 +62,13 @@ const OngoingTournamentView = ({ tournament, teams }) => {
                 </div>
             )}
 
-            {matches.length === 0 && teams.length >= 2 && (
-                <button
-                    onClick={generateMatches}
-                    disabled={generating}
-                    className="w-full bg-indigo-600 text-white py-2 rounded-lg"
-                >
-                    {generating ? "Generating..." : "Generate Matches"}
-                </button>
-            )}
 
-            {teams.length < 2 && (
+            {matches.length === 0 && teams.length < 2 && (
                 <p className="text-sm text-red-500 text-center">
                     Add at least 2 teams to generate matches
                 </p>
             )}
+
 
             {matches.length === 0 ? (
                 <p className="text-sm text-gray-500 text-center">
@@ -162,16 +88,44 @@ const OngoingTournamentView = ({ tournament, teams }) => {
                             </div>
 
                             {m.status === "finished" ? (
-                                <div className="text-sm mt-2 text-green-700">
-                                    Winner:{" "}
-                                    {m.winnerTeamId === m.teamAId
-                                        ? m.teamAName
-                                        : m.teamBName}
+                                <div className="mt-2 space-y-1 text-sm">
+                                    <p className="text-green-700 font-semibold">
+                                        Winner: {m.winnerTeamId === m.teamAId ? m.teamAName : m.teamBName}
+                                    </p>
+
+                                    {/* Set summary */}
+                                    {m.sets?.map((set, idx) => (
+                                        <div
+                                            key={idx}
+                                            className="flex justify-between bg-gray-100 px-2 py-1 rounded"
+                                        >
+                                            <span>Set {idx + 1}</span>
+                                            <span>{set.teamA} - {set.teamB}</span>
+                                        </div>
+                                    ))}
                                 </div>
                             ) : (
                                 <div className="text-sm mt-2 text-gray-500">
                                     Status: {m.status}
+                                    {m.status === "live" && (
+                                        <button
+                                            onClick={() => navigate(`/matches/live/${m.id}`)}
+                                            className="mt-2 w-full bg-orange-600 text-white py-1 rounded"
+                                        >
+                                            Resume Match
+                                        </button>
+                                    )}
                                 </div>
+                            )}
+
+                            {/* ✅ START MATCH BUTTON */}
+                            {m.status === "upcoming" && (
+                                <button
+                                    onClick={() => navigate(`/matches/live/${m.id}`)}
+                                    className="mt-2 w-full bg-green-600 text-white py-1 rounded"
+                                >
+                                    Start Match
+                                </button>
                             )}
                         </div>
                     ))}

@@ -1,0 +1,23 @@
+{
+    "indexes": [
+        {
+            "collectionGroup": "teamStats",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "tournamentId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "points",
+                    "order": "DESCENDING"
+                },
+                {
+                    "fieldPath": "wins",
+                    "order": "DESCENDING"
+                }
+            ]
+        }
+    ],
+    "fieldOverrides": []
+}
