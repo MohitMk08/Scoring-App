@@ -56,7 +56,7 @@ export default function DashboardLayout({ children }) {
                         Team List
                     </NavLink>
                     <NavLink
-                        to="/matches"
+                        to="/matches/create"
                         className={({ isActive }) =>
                             `px-4 py-2 rounded ${isActive ? "bg-blue-600 text-white" : "text-gray-700 hover:bg-blue-50"
                             }`

@@ -1,208 +1,214 @@
-import { useEffect, useState } from "react";
-import { doc, onSnapshot, updateDoc } from "firebase/firestore";
+import React, { useEffect, useState } from "react";
+import {
+    doc,
+    updateDoc,
+    onSnapshot,
+    Timestamp,
+} from "firebase/firestore";
 import { db } from "../firebase";
+import { useNavigate } from "react-router-dom";
 
-export default function MatchLive({ matchId, teamsMap }) {
+const MatchLive = ({ matchId }) => {
+    const navigate = useNavigate();
+
     const [match, setMatch] = useState(null);
-    const [pointsA, setPointsA] = useState(0);
-    const [pointsB, setPointsB] = useState(0);
+    const [loading, setLoading] = useState(true);
 
-    // Load match in real-time
+    // 🔹 Listen to match (SINGLE SOURCE)
     useEffect(() => {
-        const unsub = onSnapshot(doc(db, "matches", matchId), (docSnap) => {
-            if (docSnap.exists()) {
-                setMatch({ id: docSnap.id, ...docSnap.data() });
+        const unsub = onSnapshot(doc(db, "matches", matchId), (snap) => {
+            if (snap.exists()) {
+                setMatch({ id: snap.id, ...snap.data() });
+                setLoading(false);
             }
         });
+
         return () => unsub();
     }, [matchId]);
 
-    if (!match) {
-        return <p className="text-center">Loading match...</p>;
-    }
+    if (loading) return <p className="text-center">Loading...</p>;
+    if (!match) return <p className="text-center">Match not found</p>;
 
-    const teamAName = teamsMap[match.teamAId]?.name || "Team A";
-    const teamBName = teamsMap[match.teamBId]?.name || "Team B";
+    const isReadOnly = match.status === "finished";
 
-    const setsToWin = Math.ceil(match.totalSets / 2);
+    const neededSets = Math.ceil((match.totalSets || 3) / 2);
+    const pointsLimit = match.pointsPerSet || 15;
 
-    // ✅ NEW: set validation rule
-    const isSetValid = pointsA >= 15 || pointsB >= 15;
+    // 🔹 Start match
+    const startMatch = async () => {
+        await updateDoc(doc(db, "matches", matchId), {
+            status: "live",
+            currentSet: 1,
+            sets: [{ teamA: 0, teamB: 0 }],
+            startedAt: Timestamp.now(),
+        });
+    };
 
-    // Add completed set
-    const addSet = async () => {
-        if (match.status === "finished") return;
+    // 🔹 Score update (TOURNAMENT STYLE)
+    const updateScore = async (team) => {
+        if (match.status !== "live") return;
 
-        // ✅ SAFETY CHECK (prevents 0-0 bug)
-        if (!isSetValid) {
-            alert("At least one team must score 15 points to record a set");
+        const sets = [...match.sets];
+        const idx = match.currentSet - 1;
+
+        sets[idx][team] += 1;
+
+        const a = sets[idx].teamA;
+        const b = sets[idx].teamB;
+
+        const setWon =
+            (a >= pointsLimit || b >= pointsLimit) &&
+            Math.abs(a - b) >= 2;
+
+        if (setWon) {
+            const aSets = sets.filter(s => s.teamA > s.teamB).length;
+            const bSets = sets.filter(s => s.teamB > s.teamA).length;
+
+            // 🔴 MATCH FINISHED
+            if (aSets === neededSets || bSets === neededSets) {
+                const winnerId =
+                    aSets > bSets ? match.teamAId : match.teamBId;
+
+                await updateDoc(doc(db, "matches", matchId), {
+                    sets,
+                    status: "finished",
+                    winnerTeamId: winnerId,
+                    finishedAt: Timestamp.now(),
+                });
+
+                return;
+            }
+
+            // next set
+            sets.push({ teamA: 0, teamB: 0 });
+
+            await updateDoc(doc(db, "matches", matchId), {
+                sets,
+                currentSet: match.currentSet + 1,
+            });
+
             return;
         }
 
-        let updatedTeamAScore = match.teamAScore;
-        let updatedTeamBScore = match.teamBScore;
+        await updateDoc(doc(db, "matches", matchId), { sets });
+    };
 
-        if (pointsA > pointsB) updatedTeamAScore++;
-        else updatedTeamBScore++;
+    // 🔹 Undo last point
+    const undoLastPoint = async () => {
+        if (match.status !== "live") return;
 
-        let status = "live";
-        let winnerTeamId = null;
+        const sets = [...match.sets];
+        const idx = match.currentSet - 1;
 
-        // Auto end match
-        if (
-            updatedTeamAScore === setsToWin ||
-            updatedTeamBScore === setsToWin
-        ) {
-            status = "finished";
-            winnerTeamId =
-                updatedTeamAScore > updatedTeamBScore
-                    ? match.teamAId
-                    : match.teamBId;
+        if (sets[idx].teamA > 0 || sets[idx].teamB > 0) {
+            if (sets[idx].teamA >= sets[idx].teamB && sets[idx].teamA > 0) {
+                sets[idx].teamA -= 1;
+            } else if (sets[idx].teamB > 0) {
+                sets[idx].teamB -= 1;
+            }
+
+            await updateDoc(doc(db, "matches", matchId), { sets });
         }
-
-        await updateDoc(doc(db, "matches", matchId), {
-            setScores: [...match.setScores, { teamA: pointsA, teamB: pointsB }],
-            teamAScore: updatedTeamAScore,
-            teamBScore: updatedTeamBScore,
-            status,
-            winnerTeamId
-        });
-
-        setPointsA(0);
-        setPointsB(0);
     };
 
     return (
-        <div className="p-4 max-w-md mx-auto space-y-5 bg-white rounded-xl shadow">
-            {/* Winner Banner */}
-            {match.status === "finished" && (
-                <div className="bg-green-100 text-green-800 p-3 rounded-lg text-center font-semibold">
-                    🏆 Winner: {teamsMap[match.winnerTeamId]?.name}
-                </div>
-            )}
-            {match.status === "finished" && (
-                <div className="bg-gray-800 text-white text-center py-2 rounded-lg text-sm font-semibold">
-                    MATCH FINISHED
-                </div>
-            )}
+        <div className="max-w-xl mx-auto p-4 space-y-4 bg-white rounded-xl shadow">
+            <h1 className="text-xl font-bold text-red-500">Live Match</h1>
 
-            {/* Match Header */}
-            <div className="text-center">
-                <h2 className="font-semibold text-lg">
-                    {teamAName} vs {teamBName}
-                </h2>
-                <p className="text-sm text-gray-600">
-                    Best of {match.totalSets} sets
-                </p>
-                <p className="mt-1 font-medium">
-                    Sets: {match.teamAScore} - {match.teamBScore}
-                </p>
-            </div>
-
-            {/* Score Controllers */}
-            <div className="grid grid-cols-2 gap-4">
-                {/* Team A */}
-                <div className="bg-gray-50 rounded-xl p-4 text-center">
-                    <p className="font-semibold mb-2 truncate">{teamAName}</p>
-                    <p className="text-4xl font-bold mb-3">{pointsA}</p>
-                    <div className="flex justify-center gap-3">
-                        <button
-                            disabled={match.status === "finished"}
-                            onClick={() => setPointsA(Math.max(0, pointsA - 1))}
-                            className={`px-4 py-2 rounded-lg text-white
-                                ${match.status === "finished"
-                                    ? "bg-gray-400 cursor-not-allowed"
-                                    : "bg-red-500"
-                                }`}
-                        >
-                            ➖
-                        </button>
-                        <button
-                            disabled={match.status === "finished"}
-                            onClick={() => setPointsA(pointsA + 1)}
-                            className={`px-4 py-2 rounded-lg text-white
-                                ${match.status === "finished"
-                                    ? "bg-gray-400 cursor-not-allowed"
-                                    : "bg-green-600"
-                                }`}
-                        >
-                            ➕
-                        </button>
-                    </div>
-                </div>
-
-                {/* Team B */}
-                <div className="bg-gray-50 rounded-xl p-4 text-center">
-                    <p className="font-semibold mb-2 truncate">{teamBName}</p>
-                    <p className="text-4xl font-bold mb-3">{pointsB}</p>
-                    <div className="flex justify-center gap-3">
-                        <button
-                            disabled={match.status === "finished"}
-                            onClick={() => setPointsB(Math.max(0, pointsB - 1))}
-                            className={`px-4 py-2 rounded-lg text-white
-                                ${match.status === "finished"
-                                    ? "bg-gray-400 cursor-not-allowed"
-                                    : "bg-red-500"
-                                }`}
-                        >
-                            ➖
-                        </button>
-                        <button
-                            disabled={match.status === "finished"}
-                            onClick={() => setPointsB(pointsB + 1)}
-                            className={`px-4 py-2 rounded-lg text-white
-                                ${match.status === "finished"
-                                    ? "bg-gray-400 cursor-not-allowed"
-                                    : "bg-green-600"
-                                }`}
-                        >
-                            ➕
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            {/* Add Set Button */}
-            {match.status === "live" && (
+            {match.status === "upcoming" && (
                 <>
-                    <button
-                        onClick={addSet}
-                        disabled={!isSetValid}
-                        className={`w-full py-2 rounded-lg text-white
-                            ${isSetValid
-                                ? "bg-blue-600 hover:bg-blue-700"
-                                : "bg-gray-300 cursor-not-allowed"
-                            }
-                        `}
-                    >
-                        Add Set Score
-                    </button>
+                    <div className="flex justify-between text-lg font-semibold">
+                        <span>{match.teamAName}</span>
+                        <span>Set 1</span>
+                        <span>{match.teamBName}</span>
+                    </div>
 
-                    {!isSetValid && (
-                        <p className="text-xs text-red-500 text-center">
-                            One team must reach at least 15 points to save a set
-                        </p>
-                    )}
+                    <button
+                        onClick={startMatch}
+                        className="w-full bg-green-600 text-white py-2 rounded-lg"
+                    >
+                        Start Match
+                    </button>
                 </>
             )}
 
-            {/* Set History */}
-            <div>
-                <h3 className="font-semibold mb-2">Set History</h3>
+            {match.status !== "upcoming" && (
+                <>
+                    <div className="flex justify-between text-lg font-semibold">
+                        <span>{match.teamAName}</span>
+                        <span>Set {match.currentSet}</span>
+                        <span>{match.teamBName}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center">
+                        <button
+                            disabled={isReadOnly}
+                            onClick={() => updateScore("teamA")}
+                            className="bg-indigo-600 text-white px-6 py-3 rounded-lg disabled:bg-gray-400"
+                        >
+                            +1
+                        </button>
+
+                        <div className="text-3xl font-bold">
+                            {match.sets?.[match.currentSet - 1]?.teamA}
+                            {" : "}
+                            {match.sets?.[match.currentSet - 1]?.teamB}
+                        </div>
+
+                        <button
+                            disabled={isReadOnly}
+                            onClick={() => updateScore("teamB")}
+                            className="bg-indigo-600 text-white px-6 py-3 rounded-lg disabled:bg-gray-400"
+                        >
+                            +1
+                        </button>
+                    </div>
+                </>
+            )}
+
+            {match.status === "live" && (
+                <button
+                    onClick={undoLastPoint}
+                    className="w-full py-2 bg-yellow-500 text-white rounded-lg"
+                >
+                    Undo Last Point
+                </button>
+            )}
+
+            {/* 🔹 Set Summary (same as tournament) */}
+            {match.sets?.length > 0 && (
                 <div className="space-y-1">
-                    {match.setScores.map((set, idx) => (
+                    {match.sets.map((s, i) => (
                         <div
-                            key={idx}
+                            key={i}
                             className="flex justify-between text-sm bg-gray-100 px-3 py-1 rounded"
                         >
-                            <span>Set {idx + 1}</span>
-                            <span>
-                                {set.teamA} - {set.teamB}
-                            </span>
+                            <span>Set {i + 1}</span>
+                            <span>{s.teamA} - {s.teamB}</span>
                         </div>
                     ))}
                 </div>
-            </div>
+            )}
+
+            {/* ✅ AFTER FINISH */}
+            {match.status === "finished" && (
+                <>
+                    <div className="text-center font-semibold text-green-700">
+                        🏆 Winner: {match.winnerTeamId === match.teamAId
+                            ? match.teamAName
+                            : match.teamBName}
+                    </div>
+
+                    <button
+                        onClick={() => navigate("/")}
+                        className="w-full bg-indigo-600 text-white py-2 rounded-lg"
+                    >
+                        Go to Home
+                    </button>
+                </>
+            )}
         </div>
     );
-}
+};
+
+export default MatchLive;
