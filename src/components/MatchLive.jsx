@@ -14,7 +14,7 @@ const MatchLive = ({ matchId }) => {
     const [match, setMatch] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    // 🔹 Listen to match (SINGLE SOURCE)
+    // 🔹 SINGLE SOURCE OF TRUTH
     useEffect(() => {
         const unsub = onSnapshot(doc(db, "matches", matchId), (snap) => {
             if (snap.exists()) {
@@ -31,83 +31,94 @@ const MatchLive = ({ matchId }) => {
 
     const isReadOnly = match.status === "finished";
 
-    const neededSets = Math.ceil((match.totalSets || 3) / 2);
+    const totalSets = match.totalSets || 3;
+    const neededSets = Math.ceil(totalSets / 2);
     const pointsLimit = match.pointsPerSet || 15;
 
-    // 🔹 Start match
+    // 🔹 START MATCH
     const startMatch = async () => {
         await updateDoc(doc(db, "matches", matchId), {
             status: "live",
-            currentSet: 1,
-            sets: [{ teamA: 0, teamB: 0 }],
+            livePoints: { teamA: 0, teamB: 0 },
+            setScores: [],
+            teamAScore: 0,
+            teamBScore: 0,
             startedAt: Timestamp.now(),
         });
     };
 
-    // 🔹 Score update (TOURNAMENT STYLE)
+    // 🔹 UPDATE SCORE (TOURNAMENT STYLE)
     const updateScore = async (team) => {
         if (match.status !== "live") return;
 
-        const sets = [...match.sets];
-        const idx = match.currentSet - 1;
+        const livePoints = { ...match.livePoints };
+        livePoints[team] += 1;
 
-        sets[idx][team] += 1;
-
-        const a = sets[idx].teamA;
-        const b = sets[idx].teamB;
+        const a = livePoints.teamA;
+        const b = livePoints.teamB;
 
         const setWon =
             (a >= pointsLimit || b >= pointsLimit) &&
             Math.abs(a - b) >= 2;
 
+        // 🟢 SET FINISHED
         if (setWon) {
-            const aSets = sets.filter(s => s.teamA > s.teamB).length;
-            const bSets = sets.filter(s => s.teamB > s.teamA).length;
+            const setScores = [...match.setScores, livePoints];
+
+            const teamAScore =
+                match.teamAScore + (a > b ? 1 : 0);
+            const teamBScore =
+                match.teamBScore + (b > a ? 1 : 0);
 
             // 🔴 MATCH FINISHED
-            if (aSets === neededSets || bSets === neededSets) {
-                const winnerId =
-                    aSets > bSets ? match.teamAId : match.teamBId;
-
+            if (teamAScore === neededSets || teamBScore === neededSets) {
                 await updateDoc(doc(db, "matches", matchId), {
-                    sets,
+                    setScores,
+                    teamAScore,
+                    teamBScore,
                     status: "finished",
-                    winnerTeamId: winnerId,
+                    winnerTeamId:
+                        teamAScore > teamBScore
+                            ? match.teamAId
+                            : match.teamBId,
                     finishedAt: Timestamp.now(),
                 });
-
                 return;
             }
 
-            // next set
-            sets.push({ teamA: 0, teamB: 0 });
-
+            // 🟡 NEXT SET
             await updateDoc(doc(db, "matches", matchId), {
-                sets,
-                currentSet: match.currentSet + 1,
+                setScores,
+                teamAScore,
+                teamBScore,
+                livePoints: { teamA: 0, teamB: 0 },
             });
 
             return;
         }
 
-        await updateDoc(doc(db, "matches", matchId), { sets });
+        // 🔵 NORMAL POINT
+        await updateDoc(doc(db, "matches", matchId), {
+            livePoints,
+        });
     };
 
-    // 🔹 Undo last point
+    // 🔹 UNDO LAST POINT
     const undoLastPoint = async () => {
         if (match.status !== "live") return;
 
-        const sets = [...match.sets];
-        const idx = match.currentSet - 1;
+        const livePoints = { ...match.livePoints };
 
-        if (sets[idx].teamA > 0 || sets[idx].teamB > 0) {
-            if (sets[idx].teamA >= sets[idx].teamB && sets[idx].teamA > 0) {
-                sets[idx].teamA -= 1;
-            } else if (sets[idx].teamB > 0) {
-                sets[idx].teamB -= 1;
+        if (livePoints.teamA > 0 || livePoints.teamB > 0) {
+            if (livePoints.teamA >= livePoints.teamB && livePoints.teamA > 0) {
+                livePoints.teamA -= 1;
+            } else if (livePoints.teamB > 0) {
+                livePoints.teamB -= 1;
             }
 
-            await updateDoc(doc(db, "matches", matchId), { sets });
+            await updateDoc(doc(db, "matches", matchId), {
+                livePoints,
+            });
         }
     };
 
@@ -119,7 +130,7 @@ const MatchLive = ({ matchId }) => {
                 <>
                     <div className="flex justify-between text-lg font-semibold">
                         <span>{match.teamAName}</span>
-                        <span>Set 1</span>
+                        <span>vs</span>
                         <span>{match.teamBName}</span>
                     </div>
 
@@ -136,7 +147,9 @@ const MatchLive = ({ matchId }) => {
                 <>
                     <div className="flex justify-between text-lg font-semibold">
                         <span>{match.teamAName}</span>
-                        <span>Set {match.currentSet}</span>
+                        <span>
+                            Sets {match.teamAScore} - {match.teamBScore}
+                        </span>
                         <span>{match.teamBName}</span>
                     </div>
 
@@ -150,9 +163,9 @@ const MatchLive = ({ matchId }) => {
                         </button>
 
                         <div className="text-3xl font-bold">
-                            {match.sets?.[match.currentSet - 1]?.teamA}
+                            {match.livePoints?.teamA ?? 0}
                             {" : "}
-                            {match.sets?.[match.currentSet - 1]?.teamB}
+                            {match.livePoints?.teamB ?? 0}
                         </div>
 
                         <button
@@ -175,10 +188,10 @@ const MatchLive = ({ matchId }) => {
                 </button>
             )}
 
-            {/* 🔹 Set Summary (same as tournament) */}
-            {match.sets?.length > 0 && (
+            {/* 🔹 SET SUMMARY */}
+            {match.setScores?.length > 0 && (
                 <div className="space-y-1">
-                    {match.sets.map((s, i) => (
+                    {match.setScores.map((s, i) => (
                         <div
                             key={i}
                             className="flex justify-between text-sm bg-gray-100 px-3 py-1 rounded"
@@ -190,11 +203,11 @@ const MatchLive = ({ matchId }) => {
                 </div>
             )}
 
-            {/* ✅ AFTER FINISH */}
             {match.status === "finished" && (
                 <>
                     <div className="text-center font-semibold text-green-700">
-                        🏆 Winner: {match.winnerTeamId === match.teamAId
+                        🏆 Winner:{" "}
+                        {match.winnerTeamId === match.teamAId
                             ? match.teamAName
                             : match.teamBName}
                     </div>

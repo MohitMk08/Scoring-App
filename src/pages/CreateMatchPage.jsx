@@ -67,17 +67,52 @@ const CreateMatchPage = () => {
         const teamAObj = teams.find((t) => t.id === teamA);
         const teamBObj = teams.find((t) => t.id === teamB);
 
+        // await addDoc(collection(db, "matches"), {
+        //     tournamentId,
+        //     teamAId: teamAObj.id,
+        //     teamAName: teamAObj.name,
+        //     teamBId: teamBObj.id,
+        //     teamBName: teamBObj.name,
+        //     teamAScore: 0,
+        //     teamBScore: 0,
+        //     status: "upcoming",
+        //     createdAt: serverTimestamp(),
+        // });
+
         await addDoc(collection(db, "matches"), {
-            tournamentId,
-            teamAId: teamAObj.id,
-            teamAName: teamAObj.name,
-            teamBId: teamBObj.id,
-            teamBName: teamBObj.name,
-            teamAScore: 0,
-            teamBScore: 0,
-            status: "upcoming",
+            type: tournamentId ? "tournament" : "individual",
+
+            tournamentId: tournamentId || null,
+            tournamentName: tournamentName || null,
+
+            teamAId,
+            teamAName,
+            teamBId,
+            teamBName,
+
+            status: "live",
+
+            totalSets,
+            pointsPerSet,
+
+            // 🔥 LIVE STATE (CRITICAL)
+            currentSet: 1,
+            currentPoints: {
+                teamA: 0,
+                teamB: 0
+            },
+
+            setScores: [],
+
+            teamASetsWon: 0,
+            teamBSetsWon: 0,
+
+            winnerTeamId: null,
+
             createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
         });
+
 
         navigate(`/tournaments/${tournamentId}`);
     };
