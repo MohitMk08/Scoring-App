@@ -44,6 +44,7 @@ const MatchLive = ({ matchId }) => {
             teamAScore: 0,
             teamBScore: 0,
             startedAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
         });
     };
 
@@ -82,6 +83,7 @@ const MatchLive = ({ matchId }) => {
                             ? match.teamAId
                             : match.teamBId,
                     finishedAt: Timestamp.now(),
+                    updatedAt: Timestamp.now(),
                 });
                 return;
             }
@@ -91,6 +93,7 @@ const MatchLive = ({ matchId }) => {
                 setScores,
                 teamAScore,
                 teamBScore,
+                updatedAt: Timestamp.now(),
                 livePoints: { teamA: 0, teamB: 0 },
             });
 
@@ -100,6 +103,7 @@ const MatchLive = ({ matchId }) => {
         // 🔵 NORMAL POINT
         await updateDoc(doc(db, "matches", matchId), {
             livePoints,
+            updatedAt: Timestamp.now(),
         });
     };
 
@@ -118,6 +122,7 @@ const MatchLive = ({ matchId }) => {
 
             await updateDoc(doc(db, "matches", matchId), {
                 livePoints,
+                updatedAt: Timestamp.now(),
             });
         }
     };
