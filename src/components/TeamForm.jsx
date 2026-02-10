@@ -12,15 +12,16 @@ import { db } from "../firebase";
 
 function TeamForm() {
     const [teamName, setTeamName] = useState("");
-    const [captain, setCaptain] = useState("");
+    const [ownerId, setOwnerId] = useState("");
+    const [captainId, setCaptainId] = useState("");
     const [players, setPlayers] = useState([]);
     const [selectedPlayers, setSelectedPlayers] = useState([]);
+    const [teamLogo, setTeamLogo] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [assignedPlayers, setAssignedPlayers] = useState({});
 
-
-    // 🔄 Load players in real-time
+    // 🔄 Load players
     useEffect(() => {
         const q = query(
             collection(db, "players"),
@@ -38,14 +39,7 @@ function TeamForm() {
         return () => unsub();
     }, []);
 
-    const togglePlayer = (id) => {
-        setSelectedPlayers((prev) =>
-            prev.includes(id)
-                ? prev.filter((pid) => pid !== id)
-                : [...prev, id]
-        );
-    };
-
+    // 🔄 Track assigned players
     useEffect(() => {
         const unsubscribe = onSnapshot(collection(db, "teams"), (snapshot) => {
             const assignedMap = {};
@@ -66,6 +60,16 @@ function TeamForm() {
         return () => unsubscribe();
     }, []);
 
+    const handleLogoUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setTeamLogo(reader.result);
+        };
+        reader.readAsDataURL(file);
+    };
 
     const getPlayerTeamConflicts = async (selectedIds) => {
         const teamSnap = await getDocs(collection(db, "teams"));
@@ -78,10 +82,7 @@ function TeamForm() {
 
             selectedIds.forEach((pid) => {
                 if (existingPlayers.includes(pid)) {
-                    conflicts.push({
-                        playerId: pid,
-                        teamName,
-                    });
+                    conflicts.push({ playerId: pid, teamName });
                 }
             });
         });
@@ -98,46 +99,46 @@ function TeamForm() {
             return;
         }
 
-        if (selectedPlayers.length < 6) {
-            setError("Select at least 6 players");
+        if (!ownerId) {
+            setError("Team owner is required");
+            return;
+        }
+
+        const finalPlayers = Array.from(
+            new Set([...selectedPlayers, ownerId])
+        );
+
+        if (finalPlayers.length < 6) {
+            setError("Team must have at least 6 players (owner included)");
             return;
         }
 
         setLoading(true);
 
         try {
-            // 🔁 Create playerId → playerName map
-            const playerMap = {};
-            players.forEach((p) => {
-                playerMap[p.id] = p.name;
-            });
-
-            // 🔍 Check conflicts
-            const conflicts = await getPlayerTeamConflicts(selectedPlayers);
+            const conflicts = await getPlayerTeamConflicts(finalPlayers);
 
             if (conflicts.length > 0) {
-                const message = conflicts
-                    .map(
-                        (c) => `${playerMap[c.playerId]} (Team ${c.teamName})`
-                    )
-                    .join(", ");
-
-                setError(`Already assigned: ${message}`);
+                setError("Some selected players are already in other teams");
                 setLoading(false);
                 return;
             }
 
-            // ✅ Save team
             await addDoc(collection(db, "teams"), {
                 name: teamName,
-                captain,
-                playerIds: selectedPlayers,
+                ownerId,
+                captainId,
+                playerIds: finalPlayers,
+                logoUrl: teamLogo || "",
                 createdAt: new Date(),
             });
 
             setTeamName("");
-            setCaptain("");
+            setOwnerId("");
+            setCaptainId("");
             setSelectedPlayers([]);
+            setTeamLogo(null);
+
             alert("Team created successfully ✅");
         } catch (err) {
             setError("Failed to create team");
@@ -145,7 +146,6 @@ function TeamForm() {
 
         setLoading(false);
     };
-
 
     return (
         <form
@@ -162,18 +162,61 @@ function TeamForm() {
                 <input
                     value={teamName}
                     onChange={(e) => setTeamName(e.target.value)}
-                    className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-400"
+                    className="w-full p-2 border rounded-lg"
                 />
+            </div>
+
+            {/* Team Logo */}
+            <div className="mb-6">
+                <label className="text-sm text-slate-600">Team Logo</label>
+                <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoUpload}
+                />
+                {teamLogo && (
+                    <img
+                        src={teamLogo}
+                        alt="logo preview"
+                        className="w-20 h-20 mt-2 rounded-full object-cover"
+                    />
+                )}
+            </div>
+
+            {/* Owner */}
+            <div className="mb-6">
+                <label className="text-sm text-slate-600">Team Owner</label>
+                <select
+                    value={ownerId}
+                    onChange={(e) => setOwnerId(e.target.value)}
+                    className="w-full p-2 border rounded-lg"
+                >
+                    <option value="">Select Owner</option>
+                    {players.map((p) => (
+                        <option key={p.id} value={p.id}>
+                            {p.name}
+                        </option>
+                    ))}
+                </select>
             </div>
 
             {/* Captain */}
             <div className="mb-6">
-                <label className="text-sm text-slate-600">Captain Name</label>
-                <input
-                    value={captain}
-                    onChange={(e) => setCaptain(e.target.value)}
-                    className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-400"
-                />
+                <label className="text-sm text-slate-600">Captain</label>
+                <select
+                    value={captainId}
+                    onChange={(e) => setCaptainId(e.target.value)}
+                    className="w-full p-2 border rounded-lg"
+                >
+                    <option value="">Select Captain</option>
+                    {finalCaptainCandidates(players, selectedPlayers, ownerId).map(
+                        (p) => (
+                            <option key={p.id} value={p.id}>
+                                {p.name}
+                            </option>
+                        )
+                    )}
+                </select>
             </div>
 
             {/* Player Selection */}
@@ -185,63 +228,59 @@ function TeamForm() {
                 <div className="grid md:grid-cols-2 gap-3 max-h-64 overflow-y-auto p-2 border rounded-lg">
                     {players.map((player) => {
                         const isAssigned = assignedPlayers[player.id];
+                        const checked = selectedPlayers.includes(player.id);
 
                         return (
                             <label
                                 key={player.id}
                                 className={`flex items-center gap-2 p-2 rounded border
-        ${isAssigned
-                                        ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                                ${isAssigned
+                                        ? "bg-gray-100 text-gray-400"
                                         : "cursor-pointer hover:bg-blue-50"
                                     }`}
                             >
                                 <input
                                     type="checkbox"
                                     disabled={!!isAssigned}
-                                    checked={selectedPlayers.includes(player.id)}
-                                    onChange={(e) => {
-                                        if (e.target.checked) {
-                                            setSelectedPlayers([...selectedPlayers, player.id]);
-                                        } else {
-                                            setSelectedPlayers(
-                                                selectedPlayers.filter((id) => id !== player.id)
-                                            );
-                                        }
-                                    }}
+                                    checked={checked}
+                                    onChange={() =>
+                                        setSelectedPlayers((prev) =>
+                                            checked
+                                                ? prev.filter((id) => id !== player.id)
+                                                : [...prev, player.id]
+                                        )
+                                    }
                                 />
-
                                 <span className="font-medium">{player.name}</span>
-
-                                {isAssigned && (
-                                    <span className="text-xs text-red-500 ml-auto">
-                                        Already in {isAssigned}
+                                {player.id === ownerId && (
+                                    <span className="ml-auto text-xs bg-purple-100 text-purple-700 px-2 rounded">
+                                        Owner
                                     </span>
                                 )}
                             </label>
                         );
                     })}
-
                 </div>
             </div>
 
             {error && (
-                <p className="text-red-600 mb-4 font-medium">
-                    {error}
-                </p>
+                <p className="text-red-600 mb-4 font-medium">{error}</p>
             )}
-
 
             <button
                 disabled={loading}
-                className={`w-full py-2 rounded-lg text-white font-medium ${loading
-                    ? "bg-gray-400"
-                    : "bg-blue-600 hover:bg-blue-700"
+                className={`w-full py-2 rounded-lg text-white font-medium ${loading ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700"
                     }`}
             >
                 {loading ? "Creating..." : "Create Team"}
             </button>
         </form>
     );
+}
+
+function finalCaptainCandidates(players, selectedPlayers, ownerId) {
+    const ids = new Set([...selectedPlayers, ownerId]);
+    return players.filter((p) => ids.has(p.id));
 }
 
 export default TeamForm;

@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { db } from "../firebase";
+import PlayerProfileModal from "./PlayerProfileModal"; // 👈 make sure this file exists
 
 function PlayerList() {
     const [players, setPlayers] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [selectedPlayer, setSelectedPlayer] = useState(null);
 
     useEffect(() => {
         const q = query(
@@ -12,7 +14,6 @@ function PlayerList() {
             orderBy("createdAt", "desc")
         );
 
-        // 🔥 Real-time listener
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const list = snapshot.docs.map((doc) => ({
                 id: doc.id,
@@ -23,9 +24,15 @@ function PlayerList() {
             setLoading(false);
         });
 
-        // 🧹 Cleanup listener
         return () => unsubscribe();
     }, []);
+
+    const getInitials = (name = "") =>
+        name
+            .split(" ")
+            .map((n) => n[0])
+            .join("")
+            .toUpperCase();
 
     if (loading) {
         return (
@@ -53,9 +60,9 @@ function PlayerList() {
                 <thead className="bg-slate-100">
                     <tr>
                         <th className="border px-4 py-2 text-left">#</th>
-                        <th className="border px-4 py-2 text-left">Name</th>
+                        <th className="border px-4 py-2 text-left">Player</th>
                         <th className="border px-4 py-2 text-left">Mobile</th>
-                        <th className="border px-4 py-2 text-left">Age</th>
+                        <th className="border px-4 py-2 text-left">Category</th>
                     </tr>
                 </thead>
 
@@ -63,20 +70,47 @@ function PlayerList() {
                     {players.map((player, index) => (
                         <tr
                             key={player.id}
-                            className="hover:bg-slate-50 transition"
+                            onClick={() => setSelectedPlayer(player)}
+                            className="hover:bg-slate-50 transition cursor-pointer"
                         >
                             <td className="border px-4 py-2">{index + 1}</td>
-                            <td className="border px-4 py-2 font-medium">
-                                {player.name}
+
+                            {/* Avatar + Name */}
+                            <td className="border px-4 py-2">
+                                <div className="flex items-center gap-3">
+                                    {player.photoURL ? (
+                                        <img
+                                            src={player.photoURL}
+                                            alt={player.name}
+                                            className="w-9 h-9 rounded-full object-cover"
+                                        />
+                                    ) : (
+                                        <div className="w-9 h-9 rounded-full bg-slate-200 flex items-center justify-center text-sm font-bold text-slate-600">
+                                            {getInitials(player.name)}
+                                        </div>
+                                    )}
+                                    <span className="font-medium text-slate-800">
+                                        {player.name}
+                                    </span>
+                                </div>
                             </td>
+
                             <td className="border px-4 py-2">{player.mobile}</td>
                             <td className="border px-4 py-2">
-                                {player.age || "-"}
+                                {player.category || "-"}
                             </td>
                         </tr>
                     ))}
                 </tbody>
             </table>
+
+            {/* 🔥 PLAYER PROFILE POPUP */}
+            {selectedPlayer && (
+                <PlayerProfileModal
+                    player={selectedPlayer}
+                    onClose={() => setSelectedPlayer(null)}
+                />
+            )}
         </div>
     );
 }
