@@ -1,20 +1,27 @@
 import { Navigate } from "react-router-dom";
-import { useAuthState } from "react-firebase-hooks/auth";
-import { auth } from "../firebase";
+import { useAuth } from "../context/AuthContext";
 
-export default function ProtectedRoute({ children }) {
-    const [user, loading] = useAuthState(auth);
+export default function ProtectedRoute({ children, allowedRoles }) {
+    const { currentUser, role, loading } = useAuth();
 
+    // ⏳ Wait until Firebase check completes
     if (loading) {
-        return (
-            <div className="flex items-center justify-center h-screen">
-                <p className="text-lg font-semibold">Loading...</p>
-            </div>
-        );
+        return null; // you can replace with spinner if needed
     }
 
-    if (!user) {
-        return <Navigate to="/Login" replace />;
+    // ❌ Not logged in
+    if (!currentUser) {
+        return <Navigate to="/login" replace />;
+    }
+
+    // ✅ If no role restriction
+    if (!allowedRoles) {
+        return children;
+    }
+
+    // ❌ Role not allowed
+    if (!allowedRoles.includes(role)) {
+        return <Navigate to="/" replace />;
     }
 
     return children;

@@ -16,41 +16,148 @@ import TournamentDetailsPage from "./pages/tournaments/TournamentDetailsPage";
 import CreateMatchPage from "./pages/CreateMatchPage";
 import EditTournament from "./pages/EditTournament";
 import MatchLivePage from "./pages/matches/MatchLivePage";
+
 import { Toaster } from "react-hot-toast";
 
 function App() {
   const location = useLocation();
 
   const hideLayout =
-    location.pathname === "/Login" ||
-    location.pathname === "/register";
+    location.pathname.toLowerCase() === "/login" ||
+    location.pathname.toLowerCase() === "/register";
 
   return (
     <>
       {hideLayout ? (
         <Routes>
-          <Route path="/Login" element={<Login />} />
+          <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
         </Routes>
       ) : (
-        <ProtectedRoute>
-          <DashboardLayout>
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/players" element={<Players />} />
-              <Route path="/teams" element={<Teams />} />
-              <Route path="/teamlistpage" element={<TeamListPage />} />
-              <Route path="/matches/create" element={<MatchesPage />} />
-              <Route path="/match-history" element={<MatchHistory />} />
-              <Route path="/tournaments" element={<TournamentListPage />} />
-              <Route path="/tournaments/create" element={<CreateTournament />} />
-              <Route path="/tournaments/:id" element={<TournamentDetailsPage />} />
-              <Route path="/tournaments/:id/create-match" element={<CreateMatchPage />} />
-              <Route path="/tournaments/:id/edit" element={<EditTournament />} />
-              <Route path="/matches/live/:matchId" element={<MatchLivePage />} />
-            </Routes>
-          </DashboardLayout>
-        </ProtectedRoute>
+        <DashboardLayout>
+          <Routes>
+
+            {/* ✅ HOME – All Logged In Users */}
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute allowedRoles={["admin", "captain", "player"]}>
+                  <Home />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* ✅ PLAYER REGISTRATION – All Users */}
+            <Route
+              path="/players"
+              element={
+                <ProtectedRoute allowedRoles={["admin", "captain", "player"]}>
+                  <Players />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* ✅ TEAM MANAGEMENT – Admin + Captain */}
+            <Route
+              path="/teams"
+              element={
+                <ProtectedRoute allowedRoles={["admin", "captain"]}>
+                  <Teams />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/teamlistpage"
+              element={
+                <ProtectedRoute allowedRoles={["admin", "captain"]}>
+                  <TeamListPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* ✅ MATCH CREATION – Admin + Captain */}
+            <Route
+              path="/matches/create"
+              element={
+                <ProtectedRoute allowedRoles={["admin", "captain"]}>
+                  <MatchesPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* ✅ MATCH HISTORY – All Logged In */}
+            <Route
+              path="/match-history"
+              element={
+                <ProtectedRoute allowedRoles={["admin", "captain", "player"]}>
+                  <MatchHistory />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* ✅ TOURNAMENT LIST – All Logged In */}
+            <Route
+              path="/tournaments"
+              element={
+                <ProtectedRoute allowedRoles={["admin", "captain", "player"]}>
+                  <TournamentListPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* ✅ CREATE TOURNAMENT – Admin + Captain */}
+            <Route
+              path="/tournaments/create"
+              element={
+                <ProtectedRoute allowedRoles={["admin", "captain"]}>
+                  <CreateTournament />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* ✅ TOURNAMENT DETAILS – All Logged In */}
+            <Route
+              path="/tournaments/:id"
+              element={
+                <ProtectedRoute allowedRoles={["admin", "captain", "player"]}>
+                  <TournamentDetailsPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* ✅ CREATE MATCH INSIDE TOURNAMENT – Admin + Captain */}
+            <Route
+              path="/tournaments/:id/create-match"
+              element={
+                <ProtectedRoute allowedRoles={["admin", "captain"]}>
+                  <CreateMatchPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* ✅ EDIT TOURNAMENT – ADMIN ONLY */}
+            <Route
+              path="/tournaments/:id/edit"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <EditTournament />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* ✅ LIVE SCORING – Admin + Captain */}
+            <Route
+              path="/matches/live/:matchId"
+              element={
+                <ProtectedRoute allowedRoles={["admin", "captain"]}>
+                  <MatchLivePage />
+                </ProtectedRoute>
+              }
+            />
+
+          </Routes>
+        </DashboardLayout>
       )}
 
       <Toaster position="top-right" />

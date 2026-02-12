@@ -3,6 +3,7 @@ import { signOut } from "firebase/auth";
 import { auth } from "../firebase";
 import toast from "react-hot-toast";
 import { NavLink, Link, useNavigate } from "react-router-dom";
+import logo from "../assets/volleylogo-dark.png"
 
 export default function DashboardLayout({ children }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -28,11 +29,9 @@ export default function DashboardLayout({ children }) {
                 sm:translate-x-0 sm:static sm:flex sm:flex-col`}
             >
                 {/* Logo */}
-                <div className="p-5 border-b flex justify-between items-center bg-linear-to-r from-blue-600 to-blue-500">
-                    <Link to="/players">
-                        <h2 className="text-xl font-bold text-white tracking-wide">
-                            VolleyScorer
-                        </h2>
+                <div className="p-5 border-b flex justify-between items-center ">
+                    <Link to="/">
+                        <img src={logo} alt="App Logo" className="h-20 w-auto" />
                     </Link>
 
                     <button
