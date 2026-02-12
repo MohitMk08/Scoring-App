@@ -8,6 +8,7 @@ import {
     serverTimestamp,
 } from "firebase/firestore";
 import { db } from "../firebase";
+import toast from "react-hot-toast";
 
 const CreateMatchPage = () => {
     const { id: tournamentId } = useParams();
@@ -22,28 +23,31 @@ const CreateMatchPage = () => {
     // 🔹 Load tournament & teams
     useEffect(() => {
         const loadData = async () => {
-            const tourRef = doc(db, "tournaments", tournamentId);
-            const tourSnap = await getDoc(tourRef);
+            try {
+                const tourRef = doc(db, "tournaments", tournamentId);
+                const tourSnap = await getDoc(tourRef);
 
-            if (tourSnap.exists()) {
-                const tourData = tourSnap.data();
-                setTournament(tourData);
+                if (tourSnap.exists()) {
+                    const tourData = tourSnap.data();
+                    setTournament(tourData);
 
-                // fetch team docs
-                const teamPromises = tourData.teams.map((teamId) =>
-                    getDoc(doc(db, "teams", teamId))
-                );
+                    const teamPromises = tourData.teams.map((teamId) =>
+                        getDoc(doc(db, "teams", teamId))
+                    );
 
-                const teamSnaps = await Promise.all(teamPromises);
+                    const teamSnaps = await Promise.all(teamPromises);
 
-                const teamList = teamSnaps
-                    .filter((t) => t.exists())
-                    .map((t) => ({
-                        id: t.id,
-                        ...t.data(),
-                    }));
+                    const teamList = teamSnaps
+                        .filter((t) => t.exists())
+                        .map((t) => ({
+                            id: t.id,
+                            ...t.data(),
+                        }));
 
-                setTeams(teamList);
+                    setTeams(teamList);
+                }
+            } catch (err) {
+                toast.error("Failed to load tournament data");
             }
 
             setLoading(false);
@@ -54,67 +58,74 @@ const CreateMatchPage = () => {
 
     // 🔹 Create match
     const handleCreateMatch = async () => {
+        // ✅ Mandatory validation
         if (!teamA || !teamB) {
-            alert("Please select both teams");
+            toast.error("Please select both teams");
             return;
         }
 
         if (teamA === teamB) {
-            alert("Team A and Team B cannot be the same");
+            toast.error("Team A and Team B cannot be the same");
             return;
         }
 
         const teamAObj = teams.find((t) => t.id === teamA);
         const teamBObj = teams.find((t) => t.id === teamB);
 
-        // await addDoc(collection(db, "matches"), {
-        //     tournamentId,
-        //     teamAId: teamAObj.id,
-        //     teamAName: teamAObj.name,
-        //     teamBId: teamBObj.id,
-        //     teamBName: teamBObj.name,
-        //     teamAScore: 0,
-        //     teamBScore: 0,
-        //     status: "upcoming",
-        //     createdAt: serverTimestamp(),
-        // });
+        if (!teamAObj || !teamBObj) {
+            toast.error("Invalid team selection");
+            return;
+        }
 
-        await addDoc(collection(db, "matches"), {
-            type: tournamentId ? "tournament" : "individual",
+        toast.loading("Creating match...", { id: "create-match" });
 
-            tournamentId: tournamentId || null,
-            tournamentName: tournamentName || null,
+        try {
+            await addDoc(collection(db, "matches"), {
+                type: tournamentId ? "tournament" : "individual",
 
-            teamAId,
-            teamAName,
-            teamBId,
-            teamBName,
+                tournamentId: tournamentId || null,
+                tournamentName: tournament?.name || null,
 
-            status: "live",
+                teamAId: teamAObj.id,
+                teamAName: teamAObj.name,
+                teamBId: teamBObj.id,
+                teamBName: teamBObj.name,
 
-            totalSets,
-            pointsPerSet,
+                status: "live",
 
-            // 🔥 LIVE STATE (CRITICAL)
-            currentSet: 1,
-            currentPoints: {
-                teamA: 0,
-                teamB: 0
-            },
+                // sensible defaults (can be edited later)
+                totalSets: 3,
+                pointsPerSet: 25,
 
-            setScores: [],
+                // 🔥 LIVE STATE
+                currentSet: 1,
+                currentPoints: {
+                    teamA: 0,
+                    teamB: 0,
+                },
 
-            teamASetsWon: 0,
-            teamBSetsWon: 0,
+                setScores: [],
 
-            winnerTeamId: null,
+                teamASetsWon: 0,
+                teamBSetsWon: 0,
 
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp()
-        });
+                winnerTeamId: null,
 
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+            });
 
-        navigate(`/tournaments/${tournamentId}`);
+            toast.success("Match created successfully ✅", {
+                id: "create-match",
+            });
+
+            navigate(`/tournaments/${tournamentId}`);
+        } catch (err) {
+            console.error(err);
+            toast.error("Failed to create match", {
+                id: "create-match",
+            });
+        }
     };
 
     if (loading) {
@@ -124,9 +135,7 @@ const CreateMatchPage = () => {
     return (
         <div className="px-3 py-4 max-w-xl mx-auto space-y-4">
             {/* Header */}
-            <h1 className="text-xl font-bold">
-                Create Match
-            </h1>
+            <h1 className="text-xl font-bold">Create Match</h1>
 
             <p className="text-sm text-gray-600">
                 Tournament: {tournament?.name}
@@ -135,7 +144,7 @@ const CreateMatchPage = () => {
             {/* Team A */}
             <div>
                 <label className="text-sm font-medium">
-                    Team A
+                    Team A <span className="text-red-500">*</span>
                 </label>
                 <select
                     value={teamA}
@@ -158,7 +167,7 @@ const CreateMatchPage = () => {
             {/* Team B */}
             <div>
                 <label className="text-sm font-medium">
-                    Team B
+                    Team B <span className="text-red-500">*</span>
                 </label>
                 <select
                     value={teamB}

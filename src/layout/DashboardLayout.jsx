@@ -1,121 +1,106 @@
 import { useState } from "react";
-import { NavLink, Link } from "react-router-dom";
+import { signOut } from "firebase/auth";
+import { auth } from "../firebase";
+import toast from "react-hot-toast";
+import { NavLink, Link, useNavigate } from "react-router-dom";
 
 export default function DashboardLayout({ children }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const navigate = useNavigate();
+
+    const handleLogout = async () => {
+        try {
+            await signOut(auth);
+            toast.success("Logged out successfully");
+            navigate("/Login");
+        } catch (error) {
+            toast.error("Logout failed");
+        }
+    };
 
     return (
-        <div className="flex min-h-screen bg-gray-50">
+        <div className="flex min-h-screen bg-gray-100">
+
             {/* Sidebar */}
-            <div
-                className={`fixed inset-y-0 left-0 z-30 w-64 bg-white shadow-md transform transition-transform duration-300
-          ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} sm:translate-x-0`}
+            <aside
+                className={`fixed inset-y-0 left-0 z-40 w-64 bg-white shadow-xl border-r transform transition-transform duration-300
+                ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
+                sm:translate-x-0 sm:static sm:flex sm:flex-col`}
             >
-                {/* Sidebar header */}
-                <div className="p-4 flex justify-between items-center border-b">
-                    <Link to="/">
-                        {/* <img src={logo} className="App-logo" alt="logo" /> */}
-                        <h2 className="text-lg font-bold text-blue-600">VolleyScorer</h2>
+                {/* Logo */}
+                <div className="p-5 border-b flex justify-between items-center bg-linear-to-r from-blue-600 to-blue-500">
+                    <Link to="/players">
+                        <h2 className="text-xl font-bold text-white tracking-wide">
+                            VolleyScorer
+                        </h2>
                     </Link>
 
                     <button
-                        className="sm:hidden text-xl"
+                        className="sm:hidden text-white text-xl"
                         onClick={() => setSidebarOpen(false)}
                     >
                         ✕
                     </button>
                 </div>
 
-                {/* Sidebar links */}
-                <nav className="flex flex-col mt-4 space-y-2">
-                    <NavLink
-                        to="/players"
-                        className={({ isActive }) =>
-                            `px-4 py-2 rounded ${isActive ? "bg-blue-600 text-white" : "text-gray-700 hover:bg-blue-50"
-                            }`
-                        }
-                    >
-                        Players
-                    </NavLink>
-                    <NavLink
-                        to="/teams"
-                        className={({ isActive }) =>
-                            `px-4 py-2 rounded ${isActive ? "bg-blue-600 text-white" : "text-gray-700 hover:bg-blue-50"
-                            }`
-                        }
-                    >
-                        Create Team
-                    </NavLink>
-                    <NavLink
-                        to="/teamlistpage"
-                        className={({ isActive }) =>
-                            `px-4 py-2 rounded ${isActive ? "bg-blue-600 text-white" : "text-gray-700 hover:bg-blue-50"
-                            }`
-                        }
-                    >
-                        Team List
-                    </NavLink>
-                    <NavLink
-                        to="/matches/create"
-                        className={({ isActive }) =>
-                            `px-4 py-2 rounded ${isActive ? "bg-blue-600 text-white" : "text-gray-700 hover:bg-blue-50"
-                            }`
-                        }
-                    >
-                        Matches
-                    </NavLink>
-                    <NavLink
-                        to="/match-history"
-                        className={({ isActive }) =>
-                            `block px-4 py-2 rounded ${isActive
-                                ? "bg-blue-600 text-white"
-                                : "text-gray-700 hover:bg-blue-50"
-                            }`
-                        }
-                    >
-                        Match History
-                    </NavLink>
-                    <NavLink
-                        to="/tournaments/create"
-                        className={({ isActive }) =>
-                            `block px-4 py-2 rounded ${isActive
-                                ? "bg-blue-600 text-white"
-                                : "text-gray-700 hover:bg-blue-50"
-                            }`
-                        }
-                    >
-                        Create Tournament
-                    </NavLink>
-                    <NavLink
-                        to="/tournaments"
-                        className={({ isActive }) =>
-                            `block px-4 py-2 rounded ${isActive
-                                ? "bg-blue-600 text-white"
-                                : "text-gray-700 hover:bg-blue-50"
-                            }`
-                        }
-                    >
-                        Tournaments
-                    </NavLink>
+                {/* Navigation */}
+                <nav className="flex-1 flex flex-col space-y-1 p-3">
+                    <NavLink to="/" className={navClass}>Home</NavLink>
+                    <NavLink to="/players" className={navClass}>Players</NavLink>
+                    <NavLink to="/teams" className={navClass}>Create Team</NavLink>
+                    <NavLink to="/teamlistpage" className={navClass}>Team List</NavLink>
+                    <NavLink to="/matches/create" className={navClass}>Matches</NavLink>
+                    <NavLink to="/match-history" className={navClass}>Match History</NavLink>
+                    <NavLink to="/tournaments/create" className={navClass}>Create Tournament</NavLink>
+                    <NavLink to="/tournaments" className={navClass}>Tournaments</NavLink>
                 </nav>
-            </div>
 
-            {/* Main content */}
-            <div className="flex-1 flex flex-col sm:ml-64 min-w-0">
-                {/* Mobile top bar */}
-                <div className="sm:hidden p-4 bg-white shadow-md flex justify-between items-center">
+                {/* Desktop Logout */}
+                <div className="hidden sm:block p-4 border-t bg-gray-50">
                     <button
-                        className="text-xl font-bold"
+                        onClick={handleLogout}
+                        className="w-full bg-red-500 hover:bg-red-600 text-white py-2 rounded-lg font-medium transition shadow-sm"
+                    >
+                        Logout
+                    </button>
+                </div>
+            </aside>
+
+            {/* Main Content */}
+            <div className="flex-1 flex flex-col">
+
+                {/* Mobile Top Bar */}
+                <div className="sm:hidden flex items-center justify-between p-4 bg-white shadow-md">
+                    <button
                         onClick={() => setSidebarOpen(true)}
+                        className="text-2xl font-bold text-blue-600"
                     >
                         ☰
                     </button>
-                    <h2 className="font-bold text-blue-600">VolleyScorer</h2>
+
+                    <h2 className="text-lg font-bold text-blue-600 tracking-wide">
+                        VolleyScorer
+                    </h2>
+
+                    <button
+                        onClick={handleLogout}
+                        className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-sm transition"
+                    >
+                        Logout
+                    </button>
                 </div>
 
-                {/* Page content */}
-                <main className="p-4 min-w-0">{children}</main>
+                {/* Page Content */}
+                <main className="flex-1 p-6 overflow-y-auto">
+                    {children}
+                </main>
             </div>
         </div>
     );
 }
+
+const navClass = ({ isActive }) =>
+    `px-4 py-2 rounded-lg transition-all duration-200 font-medium ${isActive
+        ? "bg-blue-600 text-white shadow"
+        : "text-gray-700 hover:bg-blue-50 hover:text-blue-600"
+    }`;

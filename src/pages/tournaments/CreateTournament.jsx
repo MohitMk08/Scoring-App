@@ -12,14 +12,14 @@ import { db } from "../../firebase";
 import { useNavigate } from "react-router-dom";
 import DashboardLayout from "../../layout/DashboardLayout";
 import { createMatches } from "../../utils/createMatches";
+import toast from "react-hot-toast";
 
 const CreateTournament = () => {
     const navigate = useNavigate();
-    const [format, setFormat] = useState("round-robin");
 
+    const [format, setFormat] = useState("round-robin");
     const [name, setName] = useState("");
     const [rules, setRules] = useState("");
-    const [location, setLocation] = useState("");
 
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
@@ -29,16 +29,16 @@ const CreateTournament = () => {
 
     const [loading, setLoading] = useState(false);
 
-
     // 🔹 Fetch all teams
     useEffect(() => {
         const fetchTeams = async () => {
             const snap = await getDocs(collection(db, "teams"));
-            const data = snap.docs.map((d) => ({
-                id: d.id,
-                ...d.data(),
-            }));
-            setTeams(data);
+            setTeams(
+                snap.docs.map((d) => ({
+                    id: d.id,
+                    ...d.data(),
+                }))
+            );
         };
 
         fetchTeams();
@@ -55,13 +55,24 @@ const CreateTournament = () => {
 
     // 🔹 Create tournament
     const handleCreateTournament = async () => {
+        // ---------- VALIDATIONS ----------
         if (!name.trim()) {
-            alert("Tournament name is required");
+            toast.error("Tournament name is required");
+            return;
+        }
+
+        if (!startDate || !endDate) {
+            toast.error("Start and end date are required");
+            return;
+        }
+
+        if (new Date(startDate) >= new Date(endDate)) {
+            toast.error("End date must be after start date");
             return;
         }
 
         if (selectedTeams.length < 2) {
-            alert("Select at least 2 teams");
+            toast.error("Select at least 2 teams");
             return;
         }
 
@@ -72,15 +83,10 @@ const CreateTournament = () => {
             const tournamentRef = await addDoc(collection(db, "tournaments"), {
                 name,
                 rules: rules || "",
-                location: location || "",
-                startDate: startDate
-                    ? Timestamp.fromDate(new Date(startDate))
-                    : null,
-                endDate: endDate
-                    ? Timestamp.fromDate(new Date(endDate))
-                    : null,
+                startDate: Timestamp.fromDate(new Date(startDate)),
+                endDate: Timestamp.fromDate(new Date(endDate)),
                 status: "upcoming",
-                format: format || "round-robin",
+                format,
                 createdAt: Timestamp.now(),
             });
 
@@ -100,202 +106,121 @@ const CreateTournament = () => {
                 );
             }
 
-            // 3️⃣ ✅ CREATE MATCHES (THIS IS THE LINE YOU ASKED ABOUT)
+            // 3️⃣ Create matches
             await createMatches(tournamentId, selectedTeams, format);
 
-            // 4️⃣ Attach tournamentId to teams (optional but ok)
+            // 4️⃣ Attach tournamentId to teams
             for (const team of selectedTeams) {
                 await updateDoc(doc(db, "teams", team.id), {
                     tournamentId,
                 });
             }
 
-            alert("Tournament created successfully");
+            toast.success("Tournament created successfully");
             navigate(`/tournaments/${tournamentId}`);
 
         } catch (error) {
-            console.error("Error creating tournament:", error);
-            alert("Something went wrong");
+            console.error(error);
+            toast.error("Something went wrong while creating tournament");
         } finally {
             setLoading(false);
         }
     };
 
-
-    // matches creation as per format
-
-    const createMatches = async (tournamentId, teams, format) => {
-        if (format === "round-robin") {
-            for (let i = 0; i < teams.length; i++) {
-                for (let j = i + 1; j < teams.length; j++) {
-                    await addDoc(collection(db, "matches"), {
-                        tournamentId,
-                        teamAId: teams[i].id,
-                        teamAName: teams[i].name,
-                        teamBId: teams[j].id,
-                        teamBName: teams[j].name,
-                        status: "upcoming",
-                        createdAt: Timestamp.now(),
-                    });
-                }
-            }
-        }
-
-        if (format === "knockout") {
-            for (let i = 0; i < teams.length; i += 2) {
-                if (!teams[i + 1]) break;
-
-                await addDoc(collection(db, "matches"), {
-                    tournamentId,
-                    teamAId: teams[i].id,
-                    teamAName: teams[i].name,
-                    teamBId: teams[i + 1].id,
-                    teamBName: teams[i + 1].name,
-                    status: "upcoming",
-                    round: 1,
-                    createdAt: Timestamp.now(),
-                });
-            }
-        }
-    };
-
-
     return (
+
         <div className="max-w-3xl mx-auto p-4 space-y-6">
-            <DashboardLayout>
-                <h1 className="text-xl font-semibold">Create Tournament</h1>
+            <h1 className="text-xl font-semibold">Create Tournament</h1>
 
-                {/* Tournament Name */}
-                <div>
-                    <label className="block text-sm font-medium mb-1">
-                        Tournament Name
-                    </label>
-                    <input
-                        type="text"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        className="w-full border rounded-lg px-3 py-2"
-                        placeholder="Enter tournament name"
-                    />
+            {/* Tournament Name */}
+            <div>
+                <label className="block text-sm font-medium mb-1">
+                    Tournament Name *
+                </label>
+                <input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full border rounded-lg px-3 py-2"
+                    placeholder="Enter tournament name"
+                />
+            </div>
+
+            {/* Format */}
+            <select
+                value={format}
+                onChange={(e) => setFormat(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2"
+            >
+                <option value="round-robin">Round Robin</option>
+                <option value="double-round-robin">Double Round Robin</option>
+                <option value="knockout">Knockout</option>
+            </select>
+
+            {/* Rules */}
+            <textarea
+                value={rules}
+                onChange={(e) => setRules(e.target.value)}
+                rows={4}
+                className="w-full border rounded-lg px-3 py-2"
+                placeholder="Tournament rules (optional)"
+            />
+
+            {/* Dates */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="border rounded-lg px-3 py-2"
+                />
+                <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="border rounded-lg px-3 py-2"
+                />
+            </div>
+
+            {/* Team Selection */}
+            <div>
+                <h2 className="text-sm font-medium mb-2">
+                    Select Teams ({selectedTeams.length})
+                </h2>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {teams.map((team) => {
+                        const selected = selectedTeams.some(
+                            (t) => t.id === team.id
+                        );
+
+                        return (
+                            <div
+                                key={team.id}
+                                onClick={() => toggleTeam(team)}
+                                className={`border rounded-lg p-3 cursor-pointer ${selected
+                                    ? "border-indigo-600 bg-indigo-50"
+                                    : "hover:bg-gray-50"
+                                    }`}
+                            >
+                                <p className="font-medium text-sm">
+                                    {team.name}
+                                </p>
+                            </div>
+                        );
+                    })}
                 </div>
-                {/* Type */}
-                <div>
-                    <select
-                        value={format}
-                        onChange={(e) => setFormat(e.target.value)}
-                        className="w-full border rounded-lg px-3 p-2 my-2"
-                    >
-                        <option value="round-robin">Round Robin</option>
-                        <option value="double-round-robin">Double Round Robin</option>
-                        <option value="knockout">Knockout</option>
-                    </select>
+            </div>
 
-                </div>
-
-                {/* Rules */}
-                <div>
-                    <label className="block text-sm font-medium mb-1">
-                        Tournament Rules / Details
-                    </label>
-                    <textarea
-                        value={rules}
-                        onChange={(e) => setRules(e.target.value)}
-                        rows={4}
-                        className="w-full border rounded-lg px-3 py-2"
-                        placeholder="Enter rules, format, or notes"
-                    />
-                </div>
-
-                {/* Location */}
-                {/* <div>
-                    <label className="block text-sm font-medium mb-1">
-                        Tournament Location / Venue
-                    </label>
-                    <input
-                        type="text"
-                        value={location}
-                        onChange={(e) => setLocation(e.target.value)}
-                        className="w-full border rounded-lg px-3 py-2"
-                        placeholder="e.g. City Stadium, Mumbai"
-                    />
-                </div> */}
-
-                {/* Dates */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                        <label className="block text-sm font-medium mb-1">
-                            Start Date
-                        </label>
-                        <input
-                            type="date"
-                            value={startDate}
-                            onChange={(e) => setStartDate(e.target.value)}
-                            className="w-full border rounded-lg px-3 py-2"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium mb-1">
-                            End Date
-                        </label>
-                        <input
-                            type="date"
-                            value={endDate}
-                            onChange={(e) => setEndDate(e.target.value)}
-                            className="w-full border rounded-lg px-3 py-2"
-                        />
-                    </div>
-                </div>
-
-                {/* Team Selection */}
-                <div className="mb-4">
-                    <h2 className="text-sm font-medium mb-2">
-                        Select Teams ({selectedTeams.length})
-                    </h2>
-
-                    {teams.length === 0 ? (
-                        <p className="text-sm text-gray-500">
-                            No teams available
-                        </p>
-                    ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            {teams.map((team) => {
-                                const selected = selectedTeams.find(
-                                    (t) => t.id === team.id
-                                );
-
-                                return (
-                                    <div
-                                        key={team.id}
-                                        onClick={() => toggleTeam(team)}
-                                        className={`border rounded-lg p-3 cursor-pointer ${selected
-                                            ? "border-indigo-600 bg-indigo-50"
-                                            : "hover:bg-gray-50"
-                                            }`}
-                                    >
-                                        <p className="font-medium text-sm">
-                                            {team.name}
-                                        </p>
-                                        {/* <p className="text-xs text-gray-500">
-                                            Players: —
-                                        </p> */}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
-
-                {/* Submit */}
-                <button
-                    onClick={handleCreateTournament}
-                    disabled={loading}
-                    className="w-full bg-indigo-600 text-white py-2 rounded-lg disabled:opacity-60"
-                >
-                    {loading ? "Creating..." : "Create Tournament"}
-                </button>
-            </DashboardLayout>
+            {/* Submit */}
+            <button
+                onClick={handleCreateTournament}
+                disabled={loading}
+                className="w-full bg-indigo-600 text-white py-2 rounded-lg disabled:opacity-60"
+            >
+                {loading ? "Creating..." : "Create Tournament"}
+            </button>
         </div>
+
     );
 };
 

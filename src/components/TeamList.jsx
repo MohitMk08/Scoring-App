@@ -6,12 +6,16 @@ import {
     updateDoc,
     deleteDoc
 } from "firebase/firestore";
-import { db } from "../firebase";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { db, storage } from "../firebase";
+import toast from "react-hot-toast";
+
 
 export default function TeamList() {
     const [teams, setTeams] = useState([]);
     const [players, setPlayers] = useState([]);
     const [editingTeamId, setEditingTeamId] = useState(null);
+    const [uploadingTeamId, setUploadingTeamId] = useState(null);
 
     // Load teams
     useEffect(() => {
@@ -37,17 +41,39 @@ export default function TeamList() {
         return () => unsub();
     }, []);
 
-    // Helper: players already assigned to any team
     const assignedPlayerIds = teams.flatMap(t => t.playerIds || []);
 
-    // Helper: playerId → name
     const playerMap = {};
     players.forEach(p => {
         playerMap[p.id] = p.name;
     });
 
+    const uploadLogo = async (teamId, file) => {
+        if (!file) return;
+
+        try {
+            setUploadingTeamId(teamId);
+            toast.loading("Uploading logo...", { id: teamId });
+
+            const logoRef = ref(storage, `team-logos/${teamId}`);
+            await uploadBytes(logoRef, file);
+
+            const url = await getDownloadURL(logoRef);
+            await updateDoc(doc(db, "teams", teamId), {
+                logoUrl: url
+            });
+
+            toast.success("Logo updated", { id: teamId });
+        } catch (err) {
+            toast.error("Failed to upload logo", { id: teamId });
+        } finally {
+            setUploadingTeamId(null);
+        }
+
+    };
+
     return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {teams.map(team => {
                 const teamPlayers = players.filter(p =>
                     team.playerIds?.includes(p.id)
@@ -61,91 +87,135 @@ export default function TeamList() {
 
                 const addPlayer = async (playerId) => {
                     if (!playerId) return;
-                    await updateDoc(doc(db, "teams", team.id), {
-                        playerIds: [...(team.playerIds || []), playerId]
-                    });
+
+                    try {
+                        await updateDoc(doc(db, "teams", team.id), {
+                            playerIds: [...(team.playerIds || []), playerId]
+                        });
+                        toast.success("Player added");
+                    } catch {
+                        toast.error("Failed to add player");
+                    }
+
                 };
 
                 const removePlayer = async (playerId) => {
-                    await updateDoc(doc(db, "teams", team.id), {
-                        playerIds: team.playerIds.filter(id => id !== playerId)
-                    });
+                    try {
+                        await updateDoc(doc(db, "teams", team.id), {
+                            playerIds: team.playerIds.filter(id => id !== playerId)
+                        });
+                        toast.success("Player removed");
+                    } catch {
+                        toast.error("Failed to remove player");
+                    }
                 };
 
                 const deleteTeam = async () => {
                     if (!confirm("Delete this team?")) return;
-                    await deleteDoc(doc(db, "teams", team.id));
+                    try {
+                        await deleteDoc(doc(db, "teams", team.id));
+                        toast.success("Team deleted");
+                    } catch {
+                        toast.error("Failed to delete team");
+                    }
+
                 };
 
                 return (
                     <div
                         key={team.id}
-                        className="bg-white rounded-xl shadow p-4 flex flex-col justify-between"
+                        className="bg-white rounded-2xl shadow-sm hover:shadow-md transition flex flex-col justify-between border"
                     >
-                        {/* ===== Header with Logo + Name ===== */}
-                        <div className="flex items-center gap-3 mb-3">
-                            {team.logoUrl ? (
-                                <img
-                                    src={team.logoUrl}
-                                    alt={team.name}
-                                    className="w-12 h-12 rounded-full object-cover"
-                                />
-                            ) : (
-                                <div className="w-12 h-12 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-600">
-                                    {team.name?.charAt(0)}
-                                </div>
-                            )}
+                        {/* ===== Header ===== */}
+                        <div className="flex items-center gap-3 p-4">
+                            <label
+                                className={`relative ${isEditing ? "cursor-pointer" : ""
+                                    }`}
+                            >
+                                {team.logoUrl ? (
+                                    <img
+                                        src={team.logoUrl}
+                                        alt={team.name}
+                                        className="w-14 h-14 rounded-full object-cover ring-2 ring-indigo-500"
+                                    />
+                                ) : (
+                                    <div className="w-14 h-14 rounded-full bg-linear-to-br from-indigo-500 to-purple-600 flex items-center justify-center font-bold text-white text-xl">
+                                        {team.name?.charAt(0)}
+                                    </div>
+                                )}
+
+                                {isEditing && (
+                                    <>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            className="hidden"
+                                            onChange={(e) =>
+                                                uploadLogo(team.id, e.target.files[0])
+                                            }
+                                        />
+                                        <span className="absolute -bottom-1 -right-1 bg-black text-white text-xs px-1 rounded">
+                                            ✎
+                                        </span>
+                                    </>
+                                )}
+
+                                {uploadingTeamId === team.id && (
+                                    <div className="absolute inset-0 bg-white/70 flex items-center justify-center text-xs rounded-full">
+                                        Uploading…
+                                    </div>
+                                )}
+                            </label>
 
                             <div className="flex-1 min-w-0">
                                 <h3 className="font-semibold text-lg truncate">
                                     {team.name}
                                 </h3>
                                 <p className="text-xs text-slate-500">
-                                    Players: {team.playerIds?.length || 0}
+                                    {team.playerIds?.length || 0} Players
                                 </p>
                             </div>
                         </div>
 
-                        {/* ===== Owner / Captain Badges ===== */}
-                        <div className="flex flex-wrap gap-2 mb-3 text-xs">
+                        {/* ===== Owner / Captain ===== */}
+                        <div className="flex flex-wrap gap-2 px-4 mb-3 text-xs">
                             {team.ownerId && (
-                                <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
+                                <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
                                     👑 Owner: {playerMap[team.ownerId] || "Unknown"}
                                 </span>
                             )}
-
                             {team.captainId && (
-                                <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                                <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
                                     🎖️ Captain: {playerMap[team.captainId] || "Unknown"}
                                 </span>
                             )}
                         </div>
 
                         {/* ===== Actions ===== */}
-                        <div className="flex gap-2 mb-3">
+                        <div className="flex gap-2 px-4 mb-3">
                             <button
-                                onClick={() =>
-                                    setEditingTeamId(isEditing ? null : team.id)
-                                }
-                                className="px-3 py-1 text-sm bg-blue-600 text-white rounded"
+                                onClick={() => {
+                                    setEditingTeamId(isEditing ? null : team.id);
+                                    toast(isEditing ? "Edit mode closed" : "Edit mode enabled");
+                                }}
+                                className="flex-1 px-3 py-1.5 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition"
                             >
                                 {isEditing ? "Done" : "Edit"}
                             </button>
 
                             <button
                                 onClick={deleteTeam}
-                                className="px-3 py-1 text-sm bg-red-600 text-white rounded"
+                                className="px-3 py-1.5 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700 transition"
                             >
                                 Delete
                             </button>
                         </div>
 
-                        {/* Divider */}
-                        <div className="h-px bg-gray-200 my-2" />
+                        <div className="h-px bg-gray-200 mx-4 my-2" />
 
-                        {/* ===== Players View ===== */}
+                        {/* ===== Players ===== */}
                         {!isEditing && (
-                            <ul className="space-y-2 text-sm">
+                            <ul className="space-y-2 px-4 pb-4 text-sm">
                                 {teamPlayers.length === 0 && (
                                     <p className="text-gray-500 text-xs">
                                         No players
@@ -155,12 +225,12 @@ export default function TeamList() {
                                 {teamPlayers.map(p => (
                                     <li
                                         key={p.id}
-                                        className="flex justify-between items-center bg-gray-50 px-3 py-2 rounded"
+                                        className="flex justify-between items-center bg-gray-50 px-3 py-2 rounded-lg"
                                     >
                                         <span className="truncate">{p.name}</span>
 
                                         {p.id === team.captainId && (
-                                            <span className="text-xs bg-yellow-200 px-2 py-0.5 rounded">
+                                            <span className="text-xs bg-yellow-200 px-2 py-0.5 rounded-full font-medium">
                                                 Captain
                                             </span>
                                         )}
@@ -171,17 +241,16 @@ export default function TeamList() {
 
                         {/* ===== Edit Mode ===== */}
                         {isEditing && (
-                            <div className="space-y-2">
+                            <div className="space-y-2 px-4 pb-4">
                                 {teamPlayers.map(p => (
                                     <div
                                         key={p.id}
-                                        className="flex justify-between items-center bg-gray-50 px-3 py-2 rounded"
+                                        className="flex justify-between items-center bg-gray-50 px-3 py-2 rounded-lg"
                                     >
                                         <span className="truncate">{p.name}</span>
-
                                         <button
                                             onClick={() => removePlayer(p.id)}
-                                            className="text-red-600 text-sm"
+                                            className="text-red-600 text-sm hover:underline"
                                         >
                                             Remove
                                         </button>
@@ -189,7 +258,7 @@ export default function TeamList() {
                                 ))}
 
                                 <select
-                                    className="w-full border rounded p-2 text-sm"
+                                    className="w-full border rounded-lg p-2 text-sm"
                                     onChange={(e) => addPlayer(e.target.value)}
                                 >
                                     <option value="">Add player</option>

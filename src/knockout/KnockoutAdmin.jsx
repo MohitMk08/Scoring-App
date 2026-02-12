@@ -8,6 +8,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { useParams } from "react-router-dom";
+import toast from "react-hot-toast";
 
 export default function KnockoutAdmin() {
     const { tournamentId } = useParams();
@@ -15,7 +16,7 @@ export default function KnockoutAdmin() {
     const [teams, setTeams] = useState([]);
     const [matches, setMatches] = useState([]);
 
-    // 1️⃣ Load teams (from league or teams collection)
+    // 1️⃣ Load teams (from tournament subcollection)
     useEffect(() => {
         const loadTeams = async () => {
             const snap = await getDocs(
@@ -39,7 +40,7 @@ export default function KnockoutAdmin() {
         loadMatches();
     }, [tournamentId]);
 
-    // 3️⃣ Create empty match
+    // 3️⃣ Create empty knockout match
     const createMatch = async () => {
         await addDoc(
             collection(db, "tournaments", tournamentId, "knockoutMatches"),
@@ -51,12 +52,14 @@ export default function KnockoutAdmin() {
                 status: "scheduled"
             }
         );
-        alert("Knockout match created");
+
+        toast.success("Knockout match created");
     };
 
-    // 4️⃣ Assign team
+    // 4️⃣ Assign team to match
     const assignTeam = async (matchId, side, teamId) => {
         const team = teams.find(t => t.id === teamId);
+        if (!team) return;
 
         await updateDoc(
             doc(db, "tournaments", tournamentId, "knockoutMatches", matchId),
@@ -67,40 +70,49 @@ export default function KnockoutAdmin() {
                 }
             }
         );
+
+        toast.success(`Assigned ${team.name}`);
     };
 
+    // 5️⃣ Enable knockout stage
     const enableKnockout = async () => {
         await updateDoc(doc(db, "tournaments", tournamentId), {
             knockoutEnabled: true,
             leagueLocked: true
         });
 
-        alert("Knockout enabled & league locked");
+        toast.success("Knockout enabled & league locked");
     };
 
     return (
-        <div>
-            <h2>Knockout Admin</h2>
+        <div className="p-4 space-y-4">
+            <h2 className="text-lg font-semibold">Knockout Admin</h2>
 
-            <button onClick={enableKnockout}>
+            <button
+                onClick={enableKnockout}
+                className="bg-indigo-600 text-white px-4 py-2 rounded"
+            >
                 Enable Knockout Stage
             </button>
 
-
-            <button onClick={createMatch}>
+            <button
+                onClick={createMatch}
+                className="bg-green-600 text-white px-4 py-2 rounded"
+            >
                 ➕ Create Knockout Match
             </button>
 
             {matches.map(match => (
-                <div key={match.id} style={{ marginTop: 20 }}>
-                    <h4>Match</h4>
+                <div key={match.id} className="border rounded p-3 space-y-2">
+                    <h4 className="font-medium">Match</h4>
 
                     <select
                         onChange={e =>
                             assignTeam(match.id, "teamA", e.target.value)
                         }
+                        className="border rounded px-2 py-1 w-full"
                     >
-                        <option>Select Team A</option>
+                        <option value="">Select Team A</option>
                         {teams.map(t => (
                             <option key={t.id} value={t.id}>
                                 {t.name}
@@ -112,8 +124,9 @@ export default function KnockoutAdmin() {
                         onChange={e =>
                             assignTeam(match.id, "teamB", e.target.value)
                         }
+                        className="border rounded px-2 py-1 w-full"
                     >
-                        <option>Select Team B</option>
+                        <option value="">Select Team B</option>
                         {teams.map(t => (
                             <option key={t.id} value={t.id}>
                                 {t.name}

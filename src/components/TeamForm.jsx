@@ -7,6 +7,7 @@ import {
     query,
     getDocs,
 } from "firebase/firestore";
+import toast from "react-hot-toast";
 
 import { db } from "../firebase";
 
@@ -95,12 +96,12 @@ function TeamForm() {
         setError("");
 
         if (!teamName) {
-            setError("Team name is required");
+            toast.error("Team name is required");
             return;
         }
 
         if (!ownerId) {
-            setError("Team owner is required");
+            toast.error("Team owner is required");
             return;
         }
 
@@ -109,17 +110,21 @@ function TeamForm() {
         );
 
         if (finalPlayers.length < 6) {
-            setError("Team must have at least 6 players (owner included)");
+            toast.error("Team must have at least 6 players (owner included)");
             return;
         }
 
         setLoading(true);
+        toast.loading("Creating team...", { id: "team-create" });
 
         try {
             const conflicts = await getPlayerTeamConflicts(finalPlayers);
 
             if (conflicts.length > 0) {
-                setError("Some selected players are already in other teams");
+                toast.error(
+                    "Some selected players are already in other teams",
+                    { id: "team-create" }
+                );
                 setLoading(false);
                 return;
             }
@@ -139,9 +144,13 @@ function TeamForm() {
             setSelectedPlayers([]);
             setTeamLogo(null);
 
-            alert("Team created successfully ✅");
+            toast.success("Team created successfully ✅", {
+                id: "team-create",
+            });
         } catch (err) {
-            setError("Failed to create team");
+            toast.error("Failed to create team", {
+                id: "team-create",
+            });
         }
 
         setLoading(false);
@@ -246,12 +255,16 @@ function TeamForm() {
                                     onChange={() =>
                                         setSelectedPlayers((prev) =>
                                             checked
-                                                ? prev.filter((id) => id !== player.id)
+                                                ? prev.filter(
+                                                    (id) => id !== player.id
+                                                )
                                                 : [...prev, player.id]
                                         )
                                     }
                                 />
-                                <span className="font-medium">{player.name}</span>
+                                <span className="font-medium">
+                                    {player.name}
+                                </span>
                                 {player.id === ownerId && (
                                     <span className="ml-auto text-xs bg-purple-100 text-purple-700 px-2 rounded">
                                         Owner
@@ -269,7 +282,9 @@ function TeamForm() {
 
             <button
                 disabled={loading}
-                className={`w-full py-2 rounded-lg text-white font-medium ${loading ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700"
+                className={`w-full py-2 rounded-lg text-white font-medium ${loading
+                    ? "bg-gray-400"
+                    : "bg-blue-600 hover:bg-blue-700"
                     }`}
             >
                 {loading ? "Creating..." : "Create Team"}

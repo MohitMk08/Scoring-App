@@ -19,11 +19,11 @@ export default function MatchesPage() {
     }, []);
 
     return (
-        <DashboardLayout>
-            <div className="space-y-6">
-                {!matchId && <MatchForm onMatchCreated={setMatchId} />}
-                {matchId && <MatchLive matchId={matchId} teamsMap={teams} />}
-            </div>
-        </DashboardLayout>
+
+        <div className="space-y-6">
+            {!matchId && <MatchForm onMatchCreated={setMatchId} />}
+            {matchId && <MatchLive matchId={matchId} teamsMap={teams} />}
+        </div>
+
     );
 }

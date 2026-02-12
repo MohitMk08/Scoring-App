@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { db, storage } from "../firebase";
+import { db } from "../firebase";
 import {
     collection,
     addDoc,
@@ -7,24 +7,19 @@ import {
     where,
     getDocs,
 } from "firebase/firestore";
-import {
-    ref,
-    uploadBytes,
-    getDownloadURL,
-} from "firebase/storage";
+import toast from "react-hot-toast";
 
 function PlayerForm() {
     const [name, setName] = useState("");
     const [mobile, setMobile] = useState("");
     const [category, setCategory] = useState("");
-    const [profilePic, setProfilePic] = useState(null);
     const [errors, setErrors] = useState({});
     const [loading, setLoading] = useState(false);
 
     const validate = () => {
         const newErrors = {};
 
-        if (!name || name.length < 3) {
+        if (!name || name.trim().length < 3) {
             newErrors.name = "Name must be at least 3 characters";
         }
 
@@ -37,6 +32,11 @@ function PlayerForm() {
         }
 
         setErrors(newErrors);
+
+        if (Object.keys(newErrors).length > 0) {
+            toast.error("Please fill all required fields");
+        }
+
         return Object.keys(newErrors).length === 0;
     };
 
@@ -54,44 +54,42 @@ function PlayerForm() {
         if (!validate()) return;
 
         setLoading(true);
+        toast.loading("Saving player...", { id: "player-form" });
 
         try {
             const exists = await isMobileExists(mobile);
+
             if (exists) {
                 setErrors({ mobile: "Mobile number already registered" });
+                toast.error("Mobile number already registered", {
+                    id: "player-form",
+                });
                 setLoading(false);
                 return;
             }
 
-            let photoURL = "";
-
-            // Upload profile picture if selected
-            if (profilePic) {
-                const imageRef = ref(
-                    storage,
-                    `players/${Date.now()}_${profilePic.name}`
-                );
-                await uploadBytes(imageRef, profilePic);
-                photoURL = await getDownloadURL(imageRef);
-            }
-
             await addDoc(collection(db, "players"), {
-                name,
+                name: name.trim(),
                 mobile,
                 category,
-                profilePic: photoURL,
+                profilePic: null, // Image disabled for now
                 createdAt: new Date(),
             });
 
+            // Reset form
             setName("");
             setMobile("");
             setCategory("");
-            setProfilePic(null);
             setErrors({});
-            alert("Player registered successfully ✅");
+
+            toast.success("Player registered successfully ✅", {
+                id: "player-form",
+            });
         } catch (err) {
             console.error(err);
-            alert("Something went wrong");
+            toast.error("Something went wrong", {
+                id: "player-form",
+            });
         }
 
         setLoading(false);
@@ -108,7 +106,9 @@ function PlayerForm() {
 
             {/* Name */}
             <div className="mb-4">
-                <label className="text-sm text-slate-600">Player Name</label>
+                <label className="text-sm text-slate-600">
+                    Player Name <span className="text-red-500">*</span>
+                </label>
                 <input
                     type="text"
                     value={name}
@@ -125,7 +125,9 @@ function PlayerForm() {
 
             {/* Mobile */}
             <div className="mb-4">
-                <label className="text-sm text-slate-600">Mobile Number</label>
+                <label className="text-sm text-slate-600">
+                    Mobile Number <span className="text-red-500">*</span>
+                </label>
                 <input
                     type="tel"
                     value={mobile}
@@ -136,13 +138,17 @@ function PlayerForm() {
                         }`}
                 />
                 {errors.mobile && (
-                    <p className="text-red-500 text-sm mt-1">{errors.mobile}</p>
+                    <p className="text-red-500 text-sm mt-1">
+                        {errors.mobile}
+                    </p>
                 )}
             </div>
 
             {/* Category */}
-            <div className="mb-4">
-                <label className="text-sm text-slate-600">Player Category</label>
+            <div className="mb-6">
+                <label className="text-sm text-slate-600">
+                    Player Category <span className="text-red-500">*</span>
+                </label>
                 <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
@@ -159,26 +165,12 @@ function PlayerForm() {
                     <option value="Blocker">Blocker</option>
                     <option value="Service-Ace">Service Ace</option>
                     <option value="Libero">Libero</option>
-
                 </select>
                 {errors.category && (
                     <p className="text-red-500 text-sm mt-1">
                         {errors.category}
                     </p>
                 )}
-            </div>
-
-            {/* Profile Pic */}
-            <div className="mb-6">
-                <label className="text-sm text-slate-600">
-                    Profile Picture (optional)
-                </label>
-                <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setProfilePic(e.target.files[0])}
-                    className="w-full mt-1"
-                />
             </div>
 
             <button
