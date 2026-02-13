@@ -16,6 +16,7 @@ import TournamentDetailsPage from "./pages/tournaments/TournamentDetailsPage";
 import CreateMatchPage from "./pages/CreateMatchPage";
 import EditTournament from "./pages/EditTournament";
 import MatchLivePage from "./pages/matches/MatchLivePage";
+import ProfilePage from "./pages/ProfilePage";
 
 import { Toaster } from "react-hot-toast";
 
@@ -152,6 +153,15 @@ function App() {
               element={
                 <ProtectedRoute allowedRoles={["admin", "captain"]}>
                   <MatchLivePage />
+                </ProtectedRoute>
+              }
+            />
+            {/* profile page route */}
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute allowedRoles={["admin", "captain", "player"]}>
+                  <ProfilePage />
                 </ProtectedRoute>
               }
             />

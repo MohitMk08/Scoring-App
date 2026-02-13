@@ -167,7 +167,7 @@ function TeamForm() {
 
             {/* Team Name */}
             <div className="mb-4">
-                <label className="text-sm text-slate-600">Team Name</label>
+                <label className="text-sm text-slate-600">Team Name<span className="text-red-500">*</span></label>
                 <input
                     value={teamName}
                     onChange={(e) => setTeamName(e.target.value)}
@@ -190,42 +190,6 @@ function TeamForm() {
                         className="w-20 h-20 mt-2 rounded-full object-cover"
                     />
                 )}
-            </div>
-
-            {/* Owner */}
-            <div className="mb-6">
-                <label className="text-sm text-slate-600">Team Owner</label>
-                <select
-                    value={ownerId}
-                    onChange={(e) => setOwnerId(e.target.value)}
-                    className="w-full p-2 border rounded-lg"
-                >
-                    <option value="">Select Owner</option>
-                    {players.map((p) => (
-                        <option key={p.id} value={p.id}>
-                            {p.name}
-                        </option>
-                    ))}
-                </select>
-            </div>
-
-            {/* Captain */}
-            <div className="mb-6">
-                <label className="text-sm text-slate-600">Captain</label>
-                <select
-                    value={captainId}
-                    onChange={(e) => setCaptainId(e.target.value)}
-                    className="w-full p-2 border rounded-lg"
-                >
-                    <option value="">Select Captain</option>
-                    {finalCaptainCandidates(players, selectedPlayers, ownerId).map(
-                        (p) => (
-                            <option key={p.id} value={p.id}>
-                                {p.name}
-                            </option>
-                        )
-                    )}
-                </select>
             </div>
 
             {/* Player Selection */}
@@ -275,6 +239,43 @@ function TeamForm() {
                     })}
                 </div>
             </div>
+
+            {/* Owner */}
+            <div className="mb-6">
+                <label className="text-sm text-slate-600">Team Owner<span className="text-red-500">*</span></label>
+                <select
+                    value={ownerId}
+                    onChange={(e) => setOwnerId(e.target.value)}
+                    className="w-full p-2 border rounded-lg"
+                >
+                    <option value="">Select Owner</option>
+                    {players.map((p) => (
+                        <option key={p.id} value={p.id}>
+                            {p.name}
+                        </option>
+                    ))}
+                </select>
+            </div>
+
+            {/* Captain */}
+            <div className="mb-6">
+                <label className="text-sm text-slate-600">Captain<span className="text-red-500">*</span></label>
+                <select
+                    value={captainId}
+                    onChange={(e) => setCaptainId(e.target.value)}
+                    className="w-full p-2 border rounded-lg"
+                >
+                    <option value="">Select Captain</option>
+                    {finalCaptainCandidates(players, selectedPlayers, ownerId).map(
+                        (p) => (
+                            <option key={p.id} value={p.id}>
+                                {p.name}
+                            </option>
+                        )
+                    )}
+                </select>
+            </div>
+
 
             {error && (
                 <p className="text-red-600 mb-4 font-medium">{error}</p>

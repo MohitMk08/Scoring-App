@@ -92,86 +92,94 @@ export default function MatchForm({ onMatchCreated }) {
     };
 
     return (
-        <form
-            onSubmit={handleSubmit}
-            className="space-y-4 p-4 bg-white rounded-xl shadow-md w-full max-w-md mx-auto"
-        >
-            {error && (
-                <p className="text-red-600 text-sm font-medium">{error}</p>
-            )}
-
-            <div>
-                <label className="block mb-1 font-medium">Team A</label>
-                <select
-                    value={teamA}
-                    onChange={(e) => setTeamA(e.target.value)}
-                    className="w-full p-2 border rounded"
-                >
-                    <option value="">Select Team</option>
-                    {teams.map(team => (
-                        <option key={team.id} value={team.id}>
-                            {team.name}
-                        </option>
-                    ))}
-                </select>
-            </div>
-
-            <div>
-                <label className="block mb-1 font-medium">Team B</label>
-                <select
-                    value={teamB}
-                    onChange={(e) => setTeamB(e.target.value)}
-                    className="w-full p-2 border rounded"
-                >
-                    <option value="">Select Team</option>
-                    {teams.map(team => (
-                        <option key={team.id} value={team.id}>
-                            {team.name}
-                        </option>
-                    ))}
-                </select>
-            </div>
-
-            <div>
-                <label className="block mb-1 font-medium">
-                    Number of Sets
-                </label>
-                <select
-                    value={totalSets}
-                    onChange={(e) => setTotalSets(Number(e.target.value))}
-                    className="w-full p-2 border rounded"
-                >
-                    {[1, 3, 5, 7].map(n => (
-                        <option key={n} value={n}>
-                            {n} Sets
-                        </option>
-                    ))}
-                </select>
-            </div>
-
-            <div>
-                <label className="block mb-1 font-medium text-gray-700">
-                    Points Per Set
-                </label>
-                <select
-                    className="w-full p-2 border rounded"
-                    value={pointsPerSet}
-                    onChange={(e) => setPointsPerSet(Number(e.target.value))}
-                >
-                    {[15, 25, 35, 45, 55].map(p => (
-                        <option key={p} value={p}>{p} Points</option>
-                    ))}
-                </select>
-            </div>
-
-
-            <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-2 bg-blue-600 text-white rounded disabled:opacity-50"
+        <div className="w-full px-4 sm:px-6 overflow-x-hidden">
+            <form
+                onSubmit={handleSubmit}
+                className="space-y-4 p-4 sm:p-6 bg-white rounded-xl shadow-md w-full max-w-md mx-auto"
             >
-                {loading ? "Creating..." : "Create Match"}
-            </button>
-        </form>
+                {error && (
+                    <p className="text-red-600 text-sm font-medium">{error}</p>
+                )}
+
+                <div>
+                    <label className="block mb-1 text-sm font-medium">
+                        Team A
+                    </label>
+                    <select
+                        value={teamA}
+                        onChange={(e) => setTeamA(e.target.value)}
+                        className="w-full p-2.5 border rounded text-sm"
+                    >
+                        <option value="">Select Team</option>
+                        {teams.map(team => (
+                            <option key={team.id} value={team.id}>
+                                {team.name}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+
+                <div>
+                    <label className="block mb-1 text-sm font-medium">
+                        Team B
+                    </label>
+                    <select
+                        value={teamB}
+                        onChange={(e) => setTeamB(e.target.value)}
+                        className="w-full p-2.5 border rounded text-sm"
+                    >
+                        <option value="">Select Team</option>
+                        {teams.map(team => (
+                            <option key={team.id} value={team.id}>
+                                {team.name}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+
+                <div>
+                    <label className="block mb-1 text-sm font-medium">
+                        Number of Sets
+                    </label>
+                    <select
+                        value={totalSets}
+                        onChange={(e) => setTotalSets(Number(e.target.value))}
+                        className="w-full p-2.5 border rounded text-sm"
+                    >
+                        {[1, 3, 5, 7].map(n => (
+                            <option key={n} value={n}>
+                                {n} Sets
+                            </option>
+                        ))}
+                    </select>
+                </div>
+
+                <div>
+                    <label className="block mb-1 text-sm font-medium">
+                        Points Per Set
+                    </label>
+                    <select
+                        className="w-full p-2.5 border rounded text-sm"
+                        value={pointsPerSet}
+                        onChange={(e) => setPointsPerSet(Number(e.target.value))}
+                    >
+                        {[15, 25, 35, 45, 55].map(p => (
+                            <option key={p} value={p}>
+                                {p} Points
+                            </option>
+                        ))}
+                    </select>
+                </div>
+
+                <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full py-2.5 bg-blue-600 text-white rounded text-sm sm:text-base disabled:opacity-50"
+                >
+                    {loading ? "Creating..." : "Create Match"}
+                </button>
+            </form>
+        </div>
     );
+
 }

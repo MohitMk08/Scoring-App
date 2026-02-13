@@ -1,4 +1,3 @@
-import DashboardLayout from "../layout/DashboardLayout";
 import TeamForm from "../components/TeamForm";
 
 function Teams() {

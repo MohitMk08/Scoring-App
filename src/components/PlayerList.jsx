@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { db } from "../firebase";
-import PlayerProfileModal from "./PlayerProfileModal"; // 👈 make sure this file exists
+import PlayerProfileModal from "./PlayerProfileModal"; // Make sure this exists
 
 function PlayerList() {
     const [players, setPlayers] = useState([]);
@@ -9,10 +9,7 @@ function PlayerList() {
     const [selectedPlayer, setSelectedPlayer] = useState(null);
 
     useEffect(() => {
-        const q = query(
-            collection(db, "players"),
-            orderBy("createdAt", "desc")
-        );
+        const q = query(collection(db, "players"), orderBy("createdAt", "desc"));
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const list = snapshot.docs.map((doc) => ({
@@ -56,55 +53,58 @@ function PlayerList() {
                 Registered Players
             </h2>
 
-            <table className="min-w-full border rounded-lg overflow-hidden">
-                <thead className="bg-slate-100">
-                    <tr>
-                        <th className="border px-4 py-2 text-left">#</th>
-                        <th className="border px-4 py-2 text-left">Player</th>
-                        <th className="border px-4 py-2 text-left">Mobile</th>
-                        <th className="border px-4 py-2 text-left">Category</th>
-                    </tr>
-                </thead>
-
-                <tbody>
-                    {players.map((player, index) => (
-                        <tr
-                            key={player.id}
-                            onClick={() => setSelectedPlayer(player)}
-                            className="hover:bg-slate-50 transition cursor-pointer"
-                        >
-                            <td className="border px-4 py-2">{index + 1}</td>
-
-                            {/* Avatar + Name */}
-                            <td className="border px-4 py-2">
-                                <div className="flex items-center gap-3">
-                                    {player.photoURL ? (
-                                        <img
-                                            src={player.photoURL}
-                                            alt={player.name}
-                                            className="w-9 h-9 rounded-full object-cover"
-                                        />
-                                    ) : (
-                                        <div className="w-9 h-9 rounded-full bg-slate-200 flex items-center justify-center text-sm font-bold text-slate-600">
-                                            {getInitials(player.name)}
-                                        </div>
-                                    )}
-                                    <span className="font-medium text-slate-800">
-                                        {player.name}
-                                    </span>
-                                </div>
-                            </td>
-
-                            <td className="border px-4 py-2">{player.mobile}</td>
-                            <td className="border px-4 py-2">
-                                {player.category || "-"}
-                            </td>
+            {/* Responsive Table */}
+            <div className="overflow-x-auto">
+                <table className="min-w-full border rounded-lg overflow-hidden">
+                    <thead className="bg-slate-100">
+                        <tr>
+                            <th className="border px-4 py-2 text-left">#</th>
+                            <th className="border px-4 py-2 text-left">Player</th>
+                            <th className="border px-4 py-2 text-left">Mobile</th>
+                            <th className="border px-4 py-2 text-left">Category</th>
                         </tr>
-                    ))}
-                </tbody>
-            </table>
+                    </thead>
 
-            {/* 🔥 PLAYER PROFILE POPUP */}
+                    <tbody>
+                        {players.map((player, index) => (
+                            <tr
+                                key={player.id}
+                                onClick={() => setSelectedPlayer(player)}
+                                className="hover:bg-slate-50 transition cursor-pointer"
+                            >
+                                <td className="border px-4 py-2">{index + 1}</td>
+
+                                {/* Avatar + Name */}
+                                <td className="border px-4 py-2">
+                                    <div className="flex items-center gap-3">
+                                        {player.photoURL ? (
+                                            <img
+                                                src={player.photoURL}
+                                                alt={player.name}
+                                                className="w-9 h-9 rounded-full object-cover"
+                                            />
+                                        ) : (
+                                            <div className="w-9 h-9 rounded-full bg-slate-200 flex items-center justify-center text-sm font-bold text-slate-600">
+                                                {getInitials(player.name)}
+                                            </div>
+                                        )}
+                                        <span className="font-medium text-slate-800 truncate">
+                                            {player.name}
+                                        </span>
+                                    </div>
+                                </td>
+
+                                <td className="border px-4 py-2 truncate">{player.mobile}</td>
+                                <td className="border px-4 py-2 truncate">
+                                    {player.category || "-"}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+
+            {/* Player Profile Modal */}
             {selectedPlayer && (
                 <PlayerProfileModal
                     player={selectedPlayer}
