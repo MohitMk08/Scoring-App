@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { signOut } from "firebase/auth";
+import { useAuth } from "../context/AuthContext";
 import { auth } from "../firebase";
 import toast from "react-hot-toast";
 import { NavLink, Link, useNavigate } from "react-router-dom";
@@ -8,10 +9,11 @@ import { FaTimes } from "react-icons/fa";
 import { FaAlignJustify } from "react-icons/fa";
 import logo from "../assets/volleylogo-dark.png";
 
-export default function DashboardLayout({ children, currentUser, role }) {
+export default function DashboardLayout({ children }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [profileOpen, setProfileOpen] = useState(false);
     const navigate = useNavigate();
+    const { currentUser, role, loading } = useAuth();
 
     const handleLogout = async () => {
         try {
@@ -36,7 +38,7 @@ export default function DashboardLayout({ children, currentUser, role }) {
                 sm:translate-x-0 sm:static sm:flex sm:flex-col`}
             >
                 {/* Logo */}
-                <div className="border-b flex justify-between items-center p-4">
+                <div className="border-b flex justify-between items-center p-2">
                     <Link to="/" onClick={closeSidebar}>
                         <img src={logo} alt="App Logo" className="h-20 w-auto" />
                     </Link>
@@ -76,47 +78,57 @@ export default function DashboardLayout({ children, currentUser, role }) {
                     </button>
 
                     <h2 className="text-lg font-bold text-blue-600 tracking-wide truncate">
-                        VolleyScorer
+                        <Link to="/" onClick={closeSidebar}>
+                            VolleyScorer
+                        </Link>
                     </h2>
 
                     {/* Profile dropdown */}
                     <div className="relative">
                         <button
                             onClick={() => setProfileOpen(!profileOpen)}
-                            className="flex items-center gap-2 bg-gray-200 px-3 py-1 rounded-full hover:bg-gray-300 transition"
+                            className="flex items-center gap-2 bg-gray-200 px-3 py-1.5 rounded-full hover:bg-gray-300 transition"
                         >
                             <FiUser />
-                            <span className="hidden sm:block text-sm">
+                            <span className="hidden sm:block text-sm truncate max-w-30">
                                 {currentUser?.displayName || currentUser?.email?.split("@")[0]}
                             </span>
                         </button>
 
                         {profileOpen && (
-                            <div className="absolute right-0 sm:right-0 left-0 sm:left-auto mt-2 w-full sm:w-64 bg-white shadow-lg rounded-lg p-3 z-50">
+                            <div
+                                className="absolute top-full mt-2 right-0 w-64 max-w-[95vw]   bg-white shadow-xl rounded-lg p-4 z-50 border"
+                            >
                                 <p className="text-sm font-semibold truncate">
                                     {currentUser?.displayName || currentUser?.email}
                                 </p>
-                                <p className="text-xs text-gray-500 mb-2">Role: {role || "Player"}</p>
 
-                                <button
-                                    onClick={() => {
-                                        closeProfile();
-                                        navigate("/profile");
-                                    }}
-                                    className="block w-full text-left text-sm py-1 hover:text-blue-600"
-                                >
-                                    My Profile
-                                </button>
+                                <p className="text-xs text-gray-500 mb-3">
+                                    Role: {loading ? "Loading..." : role || "Player"}
+                                </p>
 
-                                <button
-                                    onClick={handleLogout}
-                                    className="block w-full text-left text-sm py-1 text-red-500 hover:text-red-700"
-                                >
-                                    Logout
-                                </button>
+                                <div className="border-t pt-2 space-y-2">
+                                    <button
+                                        onClick={() => {
+                                            closeProfile();
+                                            navigate("/profile");
+                                        }}
+                                        className="block w-full text-left text-sm hover:text-blue-600"
+                                    >
+                                        My Profile
+                                    </button>
+
+                                    <button
+                                        onClick={handleLogout}
+                                        className="block w-full text-left text-sm text-red-500 hover:text-red-700"
+                                    >
+                                        Logout
+                                    </button>
+                                </div>
                             </div>
                         )}
                     </div>
+
                 </div>
 
                 {/* Page Content */}

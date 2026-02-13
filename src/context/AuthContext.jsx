@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, onSnapshot } from "firebase/firestore";
 import { auth, db } from "../firebase";
 
 const AuthContext = createContext();
@@ -11,32 +11,44 @@ export function AuthProvider({ children }) {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (user) => {
-            try {
-                if (user) {
-                    setCurrentUser(user);
+        let unsubscribeRole = null;
 
-                    // 🔥 Fetch role from Firestore
-                    const userDoc = await getDoc(doc(db, "users", user.uid));
+        const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+            if (user) {
+                setCurrentUser(user);
 
-                    if (userDoc.exists()) {
-                        setRole(userDoc.data().role || null);
+                // 🔥 Realtime Firestore role listener
+                const userRef = doc(db, "users", user.uid);
+
+                unsubscribeRole = onSnapshot(userRef, (snapshot) => {
+                    console.log("UID:", user.uid);
+                    console.log("Exists:", snapshot.exists());
+                    console.log("Data:", snapshot.data());
+
+                    if (snapshot.exists()) {
+                        setRole(snapshot.data().role || null);
                     } else {
                         setRole(null);
                     }
-                } else {
-                    setCurrentUser(null);
-                    setRole(null);
-                }
-            } catch (error) {
-                console.error("Auth error:", error);
+                });
+
+            } else {
+                setCurrentUser(null);
                 setRole(null);
+
+                if (unsubscribeRole) {
+                    unsubscribeRole();
+                    unsubscribeRole = null;
+                }
             }
 
             setLoading(false);
         });
 
-        return unsubscribe;
+        return () => {
+            unsubscribeAuth();
+            if (unsubscribeRole) unsubscribeRole();
+        };
     }, []);
 
     const logout = async () => {
