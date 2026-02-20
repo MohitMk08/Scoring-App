@@ -10,9 +10,12 @@ import {
 } from "firebase/firestore";
 import { db } from "../../firebase";
 import { useNavigate } from "react-router-dom";
-import DashboardLayout from "../../layout/DashboardLayout";
 import { createMatches } from "../../utils/createMatches";
 import toast from "react-hot-toast";
+import { getAuth } from "firebase/auth";
+
+
+
 
 const CreateTournament = () => {
     const navigate = useNavigate();

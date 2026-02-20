@@ -41,7 +41,7 @@ const CreateMatchPage = () => {
                         .filter((t) => t.exists())
                         .map((t) => ({
                             id: t.id,
-                            ...t.data(),
+                            ...t.data(),   // ⚠️ make sure team doc contains logo field
                         }));
 
                     setTeams(teamList);
@@ -58,7 +58,6 @@ const CreateMatchPage = () => {
 
     // 🔹 Create match
     const handleCreateMatch = async () => {
-        // ✅ Mandatory validation
         if (!teamA || !teamB) {
             toast.error("Please select both teams");
             return;
@@ -88,16 +87,17 @@ const CreateMatchPage = () => {
 
                 teamAId: teamAObj.id,
                 teamAName: teamAObj.name,
+                teamALogo: teamAObj.logoUrl || "",   // ✅ ADDED
+
                 teamBId: teamBObj.id,
                 teamBName: teamBObj.name,
+                teamBLogo: teamBObj.logoUrl || "",   // ✅ ADDED
 
                 status: "live",
 
-                // sensible defaults (can be edited later)
                 totalSets: 3,
                 pointsPerSet: 25,
 
-                // 🔥 LIVE STATE
                 currentSet: 1,
                 currentPoints: {
                     teamA: 0,
@@ -134,14 +134,12 @@ const CreateMatchPage = () => {
 
     return (
         <div className="px-3 py-4 max-w-xl mx-auto space-y-4">
-            {/* Header */}
             <h1 className="text-xl font-bold">Create Match</h1>
 
             <p className="text-sm text-gray-600">
                 Tournament: {tournament?.name}
             </p>
 
-            {/* Team A */}
             <div>
                 <label className="text-sm font-medium">
                     Team A <span className="text-red-500">*</span>
@@ -164,7 +162,6 @@ const CreateMatchPage = () => {
                 </select>
             </div>
 
-            {/* Team B */}
             <div>
                 <label className="text-sm font-medium">
                     Team B <span className="text-red-500">*</span>
@@ -187,7 +184,6 @@ const CreateMatchPage = () => {
                 </select>
             </div>
 
-            {/* Actions */}
             <div className="flex gap-2 pt-2">
                 <button
                     onClick={() => navigate(-1)}

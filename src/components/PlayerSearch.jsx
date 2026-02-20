@@ -58,7 +58,7 @@ function PlayerSearch() {
                 <div className="mt-4 p-4 bg-slate-50 rounded-lg">
                     <p><strong>Name:</strong> {player.name}</p>
                     <p><strong>Mobile:</strong> {player.mobile}</p>
-                    <p><strong>Age:</strong> {player.age || "N/A"}</p>
+                    <p><strong>Category:</strong> {player.category || "N/A"}</p>
                 </div>
             )}
         </div>

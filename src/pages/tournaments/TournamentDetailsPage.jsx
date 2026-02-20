@@ -18,7 +18,6 @@ import UpcomingTournamentView from "../../components/tournaments/UpcomingTournam
 import CompletedTournamentView from "../../components/tournaments/CompletedTournamentView";
 import TournamentLeaderboard from "../../components/tournaments/TournamentLeaderboard";
 
-import DashboardLayout from "../../layout/DashboardLayout";
 
 const TournamentDetailsPage = () => {
     const { id } = useParams();

@@ -124,7 +124,7 @@ export default function TeamList() {
                 return (
                     <div
                         key={team.id}
-                        className="bg-white rounded-2xl shadow-sm hover:shadow-md transition flex flex-col justify-between border"
+                        className="bg-white rounded-2xl shadow-sm hover:shadow-md transition flex flex-col border"
                     >
                         {/* ===== Header ===== */}
                         <div className="flex items-center gap-3 p-4">

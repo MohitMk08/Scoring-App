@@ -4,7 +4,10 @@ import { AuthProvider } from "./context/AuthContext";
 import App from "./App";
 import { BrowserRouter } from "react-router-dom";
 import { registerSW } from 'virtual:pwa-register'
+import { requestNotificationPermission } from "./firebase-messaging";
 import "./index.css";
+
+// requestNotificationPermission();
 
 registerSW({ immediate: true })
 
