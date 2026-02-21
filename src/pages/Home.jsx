@@ -62,7 +62,7 @@ export default function Home({ user }) {
             where("status", "==", "live")
         );
 
-        return onSnapshot(q, snap => {
+        return onSnapshot(q, async snap => {
             const data = snap.docs.map(d => ({
                 id: d.id,
                 ...d.data()
@@ -74,7 +74,23 @@ export default function Home({ user }) {
                     (a.updatedAt?.seconds || 0)
             );
 
-            setLiveMatches(data);
+            // setLiveMatches(data);
+
+            const updated = await Promise.all(
+                data.map(async (m) => {
+                    const viewersSnap = await getDocs(
+                        collection(db, "matches", m.id, "viewers")
+                    );
+
+                    return {
+                        ...m,
+                        viewersCount: viewersSnap.size
+                    };
+                })
+            );
+
+            setLiveMatches(updated);
+
         });
     }, []);
 
@@ -152,7 +168,7 @@ export default function Home({ user }) {
 
             {/* ---------- LIVE MATCHES ---------- */}
             <section className="space-y-3">
-                {/* <button
+                <button
                     onClick={async () => {
                         const token = await requestNotificationPermission();
                         console.log("Token:", token);
@@ -160,7 +176,7 @@ export default function Home({ user }) {
                     className="bg-blue-500 text-white px-4 py-2 rounded"
                 >
                     Enable Notifications
-                </button> */}
+                </button>
 
                 <h2 className="font-semibold text-lg">Live Matches</h2>
 
@@ -180,6 +196,9 @@ export default function Home({ user }) {
                             className="cursor-pointer"
                         >
                             <LiveMatchReadonly matchId={match.id} />
+                            <span className="text-xs text-gray-500">
+                                👁 {match.viewersCount || 0}
+                            </span>
                         </div>
                     ))}
                 </div>

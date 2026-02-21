@@ -1,70 +1,150 @@
-import { X } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+    doc,
+    getDoc,
+    collection,
+    getDocs,
+    query,
+    where
+} from "firebase/firestore";
+import { db } from "../firebase";
+import { FiUser, FiMail, FiX } from "react-icons/fi";
 
 export default function PlayerProfileModal({ player, onClose }) {
+
+    const [matchesPlayed, setMatchesPlayed] = useState(0);
+    const [teamName, setTeamName] = useState("");
+    const [tournamentName, setTournamentName] = useState("");
+    const [isWinner, setIsWinner] = useState(false);
+
+    useEffect(() => {
+        if (!player) return;
+
+        const fetchData = async () => {
+
+            // 1️⃣ Find Team
+            const teamQuery = query(
+                collection(db, "teams"),
+                where("playerIds", "array-contains", player.id)
+            );
+
+            const teamSnap = await getDocs(teamQuery);
+
+            if (teamSnap.empty) return;
+
+            const teamDoc = teamSnap.docs[0];
+            const teamData = teamDoc.data();
+            const teamId = teamDoc.id;
+
+            setTeamName(teamData.name);
+
+            // 2️⃣ Count Matches
+            const q1 = query(
+                collection(db, "matches"),
+                where("teamAId", "==", teamId)
+            );
+
+            const q2 = query(
+                collection(db, "matches"),
+                where("teamBId", "==", teamId)
+            );
+
+            const snap1 = await getDocs(q1);
+            const snap2 = await getDocs(q2);
+
+            setMatchesPlayed(snap1.size + snap2.size);
+
+            // 3️⃣ Tournament
+            if (teamData.tournamentId) {
+                const tournamentRef = doc(db, "tournaments", teamData.tournamentId);
+                const tournamentSnap = await getDoc(tournamentRef);
+
+                if (tournamentSnap.exists()) {
+                    const tournamentData = tournamentSnap.data();
+                    setTournamentName(tournamentData.name);
+
+                    if (tournamentData.winnerTeamId === teamId) {
+                        setIsWinner(true);
+                    }
+                }
+            }
+        };
+
+        fetchData();
+    }, [player]);
+
     if (!player) return null;
 
-    const getInitials = (name = "") =>
-        name
-            .split(" ")
-            .map(n => n[0])
-            .join("")
-            .toUpperCase();
-
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-            <div className="bg-white w-full max-w-md rounded-2xl shadow-xl relative">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 px-4">
+
+            <div className="bg-white w-full max-w-xl rounded-3xl shadow-2xl p-8 relative animate-fadeIn">
 
                 {/* Close */}
                 <button
                     onClick={onClose}
-                    className="absolute right-4 top-4 text-gray-500 hover:text-black"
+                    className="absolute top-6 right-6 text-gray-400 hover:text-gray-600"
                 >
-                    <X size={20} />
+                    <FiX size={22} />
                 </button>
 
                 {/* Header */}
-                <div className="p-6 border-b">
-                    <div className="flex items-center gap-4">
-                        {player.photoURL ? (
-                            <img
-                                src={player.photoURL}
-                                className="w-16 h-16 rounded-full object-cover"
-                                alt={player.name}
-                            />
-                        ) : (
-                            <div className="w-16 h-16 rounded-full bg-slate-200 flex items-center justify-center text-xl font-bold text-slate-600">
-                                {getInitials(player.name)}
-                            </div>
-                        )}
+                <div className="flex flex-col items-center text-center">
 
-                        <div>
-                            <h2 className="text-xl font-bold">{player.name}</h2>
-                            <p className="text-sm text-gray-500">
-                                {player.category || "No category"}
-                            </p>
+                    {player.profilePic ? (
+                        <img
+                            src={player.profilePic}
+                            alt={player.name}
+                            className="w-24 h-24 rounded-full object-cover ring-4 ring-indigo-200 shadow-md"
+                        />
+                    ) : (
+                        <div className="w-24 h-24 rounded-full bg-linear-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-3xl shadow-md">
+                            <FiUser />
                         </div>
-                    </div>
-                </div>
+                    )}
 
-                {/* Body */}
-                <div className="p-6 space-y-3 text-sm">
-                    <div className="flex justify-between">
-                        <span className="text-gray-500">Mobile</span>
-                        <span className="font-medium">{player.mobile}</span>
-                    </div>
+                    <h2 className="mt-4 text-2xl font-bold text-gray-800">
+                        {player.name}
+                    </h2>
 
-                    <div className="flex justify-between">
-                        <span className="text-gray-500">Category</span>
-                        <span className="font-medium">{player.category}</span>
-                    </div>
-
-                    <div className="flex justify-between">
-                        <span className="text-gray-500">Team</span>
-                        <span className="font-medium">
-                            {player.teamName || "No team "}
+                    {player.category && (
+                        <span className="mt-2 px-3 py-1 text-xs font-medium bg-indigo-100 text-indigo-600 rounded-full">
+                            {player.category}
                         </span>
+                    )}
+                </div>
+
+                {/* Stats */}
+                <div className="grid grid-cols-3 gap-4 mt-8 text-center">
+
+                    <div className="bg-gray-50 rounded-xl p-4 shadow-sm">
+                        <p className="text-lg font-bold text-indigo-600">
+                            {teamName || "-"}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">Team</p>
+                    </div>
+
+                    <div className="bg-gray-50 rounded-xl p-4 shadow-sm">
+                        <p className="text-lg font-bold text-purple-600">
+                            {matchesPlayed}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">Matches</p>
+                    </div>
+
+                    <div className="bg-gray-50 rounded-xl p-4 shadow-sm">
+                        <p className="text-lg font-bold text-pink-600">
+                            {tournamentName || "-"}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">Tournament</p>
                     </div>
                 </div>
+
+                {isWinner && (
+                    <div className="mt-6 bg-linear-to-r from-yellow-400 to-orange-400 text-white text-center py-3 rounded-xl font-semibold shadow-md">
+                        🏆 Tournament Winner
+                    </div>
+                )}
+
             </div>
         </div>
     );

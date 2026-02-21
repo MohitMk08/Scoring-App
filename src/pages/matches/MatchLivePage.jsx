@@ -8,11 +8,12 @@ import {
     where,
     getDocs,
     collection,
-    increment
+    increment,
+    setDoc,
+    deleteDoc
 } from "firebase/firestore";
 import { db } from "../../firebase";
 import { useParams, useNavigate } from "react-router-dom";
-import DashboardLayout from "../../layout/DashboardLayout";
 
 const MatchLivePage = () => {
     const { matchId } = useParams();
@@ -40,6 +41,23 @@ const MatchLivePage = () => {
 
     const neededSets = Math.ceil((match.totalSets || 3) / 2);
     const isReadOnly = match.status === "finished";
+
+    useEffect(() => {
+        if (!user || !matchId) return;
+
+        const viewerRef = doc(db, "matches", matchId, "viewers", user.uid);
+
+        // Add viewer
+        setDoc(viewerRef, {
+            joinedAt: new Date()
+        });
+
+        // Remove viewer when leaving page
+        return () => {
+            deleteDoc(viewerRef);
+        };
+    }, [matchId, user]);
+
 
     // 🔹 Start match
     const startMatch = async () => {

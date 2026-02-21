@@ -71,7 +71,7 @@ function App() {
             <Route
               path="/teamlistpage"
               element={
-                <ProtectedRoute allowedRoles={["admin", "captain"]}>
+                <ProtectedRoute allowedRoles={["admin", "captain", "player"]}>
                   <TeamListPage />
                 </ProtectedRoute>
               }

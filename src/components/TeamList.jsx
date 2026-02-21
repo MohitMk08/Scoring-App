@@ -8,10 +8,12 @@ import {
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "../firebase";
+import { useAuth } from "../context/AuthContext";
 import toast from "react-hot-toast";
 
-
 export default function TeamList() {
+    const { role } = useAuth(); // ✅ FIX ADDED
+
     const [teams, setTeams] = useState([]);
     const [players, setPlayers] = useState([]);
     const [editingTeamId, setEditingTeamId] = useState(null);
@@ -69,7 +71,6 @@ export default function TeamList() {
         } finally {
             setUploadingTeamId(null);
         }
-
     };
 
     return (
@@ -96,7 +97,6 @@ export default function TeamList() {
                     } catch {
                         toast.error("Failed to add player");
                     }
-
                 };
 
                 const removePlayer = async (playerId) => {
@@ -118,7 +118,6 @@ export default function TeamList() {
                     } catch {
                         toast.error("Failed to delete team");
                     }
-
                 };
 
                 return (
@@ -126,12 +125,9 @@ export default function TeamList() {
                         key={team.id}
                         className="bg-white rounded-2xl shadow-sm hover:shadow-md transition flex flex-col border"
                     >
-                        {/* ===== Header ===== */}
+                        {/* Header */}
                         <div className="flex items-center gap-3 p-4">
-                            <label
-                                className={`relative ${isEditing ? "cursor-pointer" : ""
-                                    }`}
-                            >
+                            <label className={`relative ${isEditing ? "cursor-pointer" : ""}`}>
                                 {team.logoUrl ? (
                                     <img
                                         src={team.logoUrl}
@@ -177,7 +173,7 @@ export default function TeamList() {
                             </div>
                         </div>
 
-                        {/* ===== Owner / Captain ===== */}
+                        {/* Owner / Captain */}
                         <div className="flex flex-wrap gap-2 px-4 mb-3 text-xs">
                             {team.ownerId && (
                                 <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
@@ -191,29 +187,31 @@ export default function TeamList() {
                             )}
                         </div>
 
-                        {/* ===== Actions ===== */}
-                        <div className="flex gap-2 px-4 mb-3">
-                            <button
-                                onClick={() => {
-                                    setEditingTeamId(isEditing ? null : team.id);
-                                    toast(isEditing ? "Edit mode closed" : "Edit mode enabled");
-                                }}
-                                className="flex-1 px-3 py-1.5 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition"
-                            >
-                                {isEditing ? "Done" : "Edit"}
-                            </button>
+                        {/* Actions */}
+                        {role !== "player" && (
+                            <div className="flex gap-2 px-4 mb-3">
+                                <button
+                                    onClick={() => {
+                                        setEditingTeamId(isEditing ? null : team.id);
+                                        toast(isEditing ? "Edit mode closed" : "Edit mode enabled");
+                                    }}
+                                    className="flex-1 px-3 py-1.5 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition"
+                                >
+                                    {isEditing ? "Done" : "Edit"}
+                                </button>
 
-                            <button
-                                onClick={deleteTeam}
-                                className="px-3 py-1.5 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700 transition"
-                            >
-                                Delete
-                            </button>
-                        </div>
+                                <button
+                                    onClick={deleteTeam}
+                                    className="px-3 py-1.5 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700 transition"
+                                >
+                                    Delete
+                                </button>
+                            </div>
+                        )}
 
                         <div className="h-px bg-gray-200 mx-4 my-2" />
 
-                        {/* ===== Players ===== */}
+                        {/* Players */}
                         {!isEditing && (
                             <ul className="space-y-2 px-4 pb-4 text-sm">
                                 {teamPlayers.length === 0 && (
@@ -239,7 +237,7 @@ export default function TeamList() {
                             </ul>
                         )}
 
-                        {/* ===== Edit Mode ===== */}
+                        {/* Edit Mode */}
                         {isEditing && (
                             <div className="space-y-2 px-4 pb-4">
                                 {teamPlayers.map(p => (

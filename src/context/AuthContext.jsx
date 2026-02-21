@@ -1,6 +1,12 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { doc, onSnapshot } from "firebase/firestore";
+import {
+    doc,
+    onSnapshot,
+    getDoc,
+    setDoc,
+    serverTimestamp
+} from "firebase/firestore";
 import { auth, db } from "../firebase";
 
 const AuthContext = createContext();
@@ -13,22 +19,30 @@ export function AuthProvider({ children }) {
     useEffect(() => {
         let unsubscribeRole = null;
 
-        const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+        const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
             if (user) {
                 setCurrentUser(user);
 
-                // 🔥 Realtime Firestore role listener
                 const userRef = doc(db, "users", user.uid);
 
-                unsubscribeRole = onSnapshot(userRef, (snapshot) => {
-                    console.log("UID:", user.uid);
-                    console.log("Exists:", snapshot.exists());
-                    console.log("Data:", snapshot.data());
+                // 🔥 Ensure user document exists (important fix)
+                const userSnap = await getDoc(userRef);
 
+                if (!userSnap.exists()) {
+                    await setDoc(userRef, {
+                        name: user.displayName || "",
+                        email: user.email,
+                        role: "player", // default role
+                        createdAt: serverTimestamp()
+                    });
+                }
+
+                // 🔥 Realtime Firestore role listener
+                unsubscribeRole = onSnapshot(userRef, (snapshot) => {
                     if (snapshot.exists()) {
-                        setRole(snapshot.data().role || null);
+                        setRole(snapshot.data().role || "player");
                     } else {
-                        setRole(null);
+                        setRole("player");
                     }
                 });
 
