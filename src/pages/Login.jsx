@@ -7,7 +7,8 @@ import {
     sendPasswordResetEmail,
 } from "firebase/auth";
 import { useAuthState } from "react-firebase-hooks/auth";
-import { auth } from "../firebase";
+import { auth, db } from "../firebase";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import toast from "react-hot-toast";
 
 export default function Login() {
@@ -24,6 +25,22 @@ export default function Login() {
         return <Navigate to="/" replace />;
     }
 
+    // 🔥 Create user document if not exists
+    const createUserIfNotExists = async (firebaseUser) => {
+        const userRef = doc(db, "users", firebaseUser.uid);
+        const userSnap = await getDoc(userRef);
+
+        if (!userSnap.exists()) {
+            await setDoc(userRef, {
+                uid: firebaseUser.uid,
+                name: firebaseUser.displayName || "User",
+                email: firebaseUser.email,
+                role: "user", // default role
+                createdAt: serverTimestamp(),
+            });
+        }
+    };
+
     // 📧 Email Login
     const handleEmailLogin = async (e) => {
         e.preventDefault();
@@ -37,7 +54,9 @@ export default function Login() {
             setLoading(true);
             toast.loading("Logging in...", { id: "login" });
 
-            await signInWithEmailAndPassword(auth, email, password);
+            const userCredential = await signInWithEmailAndPassword(auth, email, password);
+
+            await createUserIfNotExists(userCredential.user);
 
             toast.success("Login successful ✅", { id: "login" });
             navigate("/");
@@ -65,13 +84,16 @@ export default function Login() {
             toast.loading("Signing in with Google...", { id: "google" });
 
             const provider = new GoogleAuthProvider();
-            await signInWithPopup(auth, provider);
+            const result = await signInWithPopup(auth, provider);
+
+            await createUserIfNotExists(result.user);
 
             toast.success("Login successful ✅", { id: "google" });
             navigate("/");
 
         } catch (error) {
             toast.error("Google login failed", { id: "google" });
+            console.error(error);
         } finally {
             setLoading(false);
         }
@@ -151,24 +173,11 @@ export default function Login() {
                                 onClick={() => setShowPassword(!showPassword)}
                                 className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-blue-600"
                             >
-                                {showPassword ? (
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                            d="M3 3l18 18M10.584 10.587A2 2 0 0114 12a2 2 0 01-3.416 1.413" />
-                                    </svg>
-                                ) : (
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                    </svg>
-                                )}
+                                👁
                             </button>
                         </div>
                     </div>
 
-                    {/* Forgot Password */}
                     <div className="text-right mb-6">
                         <button
                             type="button"
