@@ -14,15 +14,7 @@ const OngoingTournamentView = ({ tournament, teams }) => {
     const navigate = useNavigate();
 
     const [matches, setMatches] = useState([]);
-    // const [generating, setGenerating] = useState(false);
 
-    const getMapUrl = (location) => {
-        if (!location) return null;
-        const encoded = encodeURIComponent(location);
-        return `https://maps.googleapis.com/maps/api/staticmap?center=${encoded}&zoom=14&size=600x300&markers=color:red|${encoded}`;
-    };
-
-    const mapUrl = getMapUrl(tournament.location);
 
     // ✅ HARD GUARD
     if (!tournament || tournament.status !== "ongoing") return null;
@@ -52,16 +44,6 @@ const OngoingTournamentView = ({ tournament, teams }) => {
 
     return (
         <div className="space-y-4">
-            {mapUrl && (
-                <div className="rounded-xl overflow-hidden border">
-                    <img
-                        src={mapUrl}
-                        alt="Tournament Location Map"
-                        className="w-full h-48 object-cover"
-                    />
-                </div>
-            )}
-
 
             {matches.length === 0 && teams.length < 2 && (
                 <p className="text-sm text-red-500 text-center">
@@ -133,6 +115,13 @@ const OngoingTournamentView = ({ tournament, teams }) => {
                 </div>
 
             )}
+
+            {/* <button
+                onClick={generateKnockoutMatches}
+                className="bg-purple-600 text-white px-4 py-2 rounded-lg"
+            >
+                Generate Knockout Stage
+            </button> */}
         </div>
     );
 };

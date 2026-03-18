@@ -137,6 +137,7 @@ const MatchLivePage = () => {
                 });
 
                 await updateTeamStats(winnerId);
+                await checkAndCreateFinalMatches();
                 return;
             }
 
@@ -169,6 +170,76 @@ const MatchLivePage = () => {
 
         await updateDoc(doc(db, "matches", matchId), {
             sets: updatedSets,
+        });
+    };
+
+    const checkAndCreateFinalMatches = async () => {
+
+        const q = query(
+            collection(db, "matches"),
+            where("tournamentId", "==", match.tournamentId),
+            where("round", "==", "semifinal")
+        );
+
+        const snap = await getDocs(q);
+
+        const semifinals = snap.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        }));
+
+        const finished = semifinals.filter(m => m.status === "finished");
+
+        if (finished.length !== 2) return;
+
+        const sf1 = semifinals.find(m => m.matchNumber === 1);
+        const sf2 = semifinals.find(m => m.matchNumber === 2);
+
+        const sf1Winner = sf1.winnerTeamId;
+        const sf2Winner = sf2.winnerTeamId;
+
+        const sf1Loser =
+            sf1Winner === sf1.teamAId ? sf1.teamBId : sf1.teamAId;
+
+        const sf2Loser =
+            sf2Winner === sf2.teamAId ? sf2.teamBId : sf2.teamAId;
+
+        // FINAL MATCH
+        await addDoc(collection(db, "matches"), {
+            tournamentId: match.tournamentId,
+            round: "final",
+
+            teamAId: sf1Winner,
+            teamAName: sf1Winner === sf1.teamAId ? sf1.teamAName : sf1.teamBName,
+
+            teamBId: sf2Winner,
+            teamBName: sf2Winner === sf2.teamAId ? sf2.teamAName : sf2.teamBName,
+
+            status: "upcoming",
+            sets: [],
+            currentSet: 1,
+            totalSets: 5,
+
+            createdAt: Timestamp.now()
+        });
+
+        // THIRD PLACE MATCH
+        await addDoc(collection(db, "matches"), {
+            tournamentId: match.tournamentId,
+            round: "third_place",
+
+            teamAId: sf1Loser,
+            teamAName: sf1Loser === sf1.teamAId ? sf1.teamAName : sf1.teamBName,
+
+            teamBId: sf2Loser,
+            teamBName: sf2Loser === sf2.teamAId ? sf2.teamAName : sf2.teamBName,
+
+            status: "upcoming",
+            sets: [],
+            currentSet: 1,
+            totalSets: 3,
+
+            createdAt: Timestamp.now()
         });
     };
 
