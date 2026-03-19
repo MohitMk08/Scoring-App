@@ -6,6 +6,9 @@ import {
     getDoc,
     addDoc,
     serverTimestamp,
+    getDocs,          // ✅ added
+    query,            // ✅ added
+    where             // ✅ added
 } from "firebase/firestore";
 import { db } from "../firebase";
 import toast from "react-hot-toast";
@@ -41,7 +44,7 @@ const CreateMatchPage = () => {
                         .filter((t) => t.exists())
                         .map((t) => ({
                             id: t.id,
-                            ...t.data(),   // ⚠️ make sure team doc contains logo field
+                            ...t.data(),
                         }));
 
                     setTeams(teamList);
@@ -79,19 +82,38 @@ const CreateMatchPage = () => {
         toast.loading("Creating match...", { id: "create-match" });
 
         try {
-            await addDoc(collection(db, "matches"), {
+            const matchesRef = collection(db, "matches");
+
+            // 🔢 Get match count for THIS tournament only
+            let matchNumber = 1;
+
+            if (tournamentId) {
+                const q = query(
+                    matchesRef,
+                    where("tournamentId", "==", tournamentId)
+                );
+                const snap = await getDocs(q);
+                matchNumber = snap.size + 1;
+            }
+
+            await addDoc(matchesRef, {
                 type: tournamentId ? "tournament" : "individual",
 
                 tournamentId: tournamentId || null,
                 tournamentName: tournament?.name || null,
 
+                // ✅ NEW FIELDS (for UI + future logic)
+                stage: "league",
+                matchNumber: matchNumber,
+                round: null,
+
                 teamAId: teamAObj.id,
                 teamAName: teamAObj.name,
-                teamALogo: teamAObj.logoUrl || "",   // ✅ ADDED
+                teamALogo: teamAObj.logoUrl || "",
 
                 teamBId: teamBObj.id,
                 teamBName: teamBObj.name,
-                teamBLogo: teamBObj.logoUrl || "",   // ✅ ADDED
+                teamBLogo: teamBObj.logoUrl || "",
 
                 status: "live",
 
@@ -99,6 +121,8 @@ const CreateMatchPage = () => {
                 pointsPerSet: 25,
 
                 currentSet: 1,
+
+                // ⚠️ keeping your existing structure
                 currentPoints: {
                     teamA: 0,
                     teamB: 0,
@@ -110,6 +134,8 @@ const CreateMatchPage = () => {
                 teamBSetsWon: 0,
 
                 winnerTeamId: null,
+
+                history: [], // ✅ required for undo fix
 
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp(),

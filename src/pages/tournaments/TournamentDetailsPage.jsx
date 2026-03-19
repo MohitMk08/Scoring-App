@@ -10,12 +10,15 @@ import {
     updateDoc,
     orderBy,
     getDocs,
-    Timestamp
+    Timestamp,
+    deleteDoc,
+    writeBatch,
+    getDoc
 } from "firebase/firestore";
-import { db } from "../../firebase";
+import { auth, db } from "../../firebase";
 import { createMatches } from "../../utils/createMatches";
 import toast from "react-hot-toast";
-import { deleteDoc } from "firebase/firestore";
+import { useNavigate } from "react-router-dom";
 
 import OngoingTournamentView from "../../components/tournaments/OngoingTournamentView";
 import UpcomingTournamentView from "../../components/tournaments/UpcomingTournamentView";
@@ -34,6 +37,8 @@ const TournamentDetailsPage = () => {
     const [matches, setMatches] = useState([]);
     const [knockoutGenerated, setKnockoutGenerated] = useState(false);
     const [leagueCompleted, setLeagueCompleted] = useState(false);
+    const [userRole, setUserRole] = useState(null);
+
 
     const leagueMatches = matches.filter(
         (m) => !m.round || m.round === "league"
@@ -204,6 +209,25 @@ const TournamentDetailsPage = () => {
             toast.error("League generation failed — check console");
         }
     };
+    // user role fetch
+    useEffect(() => {
+        const fetchUserRole = async () => {
+            if (!auth.currentUser) return;
+
+            try {
+                const userRef = doc(db, "users", auth.currentUser.uid);
+                const snap = await getDoc(userRef);
+
+                if (snap.exists()) {
+                    setUserRole(snap.data().role);
+                }
+            } catch (err) {
+                console.error("Error fetching user role:", err);
+            }
+        };
+
+        fetchUserRole();
+    }, []);
 
     // 🔹 Fetch tournament
     useEffect(() => {
@@ -387,12 +411,53 @@ const TournamentDetailsPage = () => {
 
     }, [matches]);
 
-    // const knockoutMatches = matches.filter(
-    //     (m) =>
-    //         m.round === "semifinal" ||
-    //         m.round === "final" ||
-    //         m.round === "third_place"
-    // );
+    // tournament delete function
+
+    const handleDeleteTournament = async () => {
+        const confirmDelete = window.confirm(
+            "⚠️ This will permanently delete the tournament and all matches. Continue?"
+        );
+
+        if (!confirmDelete) return;
+
+        try {
+            const batch = writeBatch(db);
+
+            // 1️⃣ Delete all matches
+            const matchesQuery = query(
+                collection(db, "matches"),
+                where("tournamentId", "==", tournamentId)
+            );
+
+            const matchesSnap = await getDocs(matchesQuery);
+
+            matchesSnap.forEach((m) => {
+                batch.delete(m.ref);
+            });
+
+            // 2️⃣ Delete tournament teams subcollection
+            const teamsSnap = await getDocs(
+                collection(db, "tournaments", tournamentId, "teams")
+            );
+
+            teamsSnap.forEach((t) => {
+                batch.delete(t.ref);
+            });
+
+            // 3️⃣ Delete tournament doc
+            batch.delete(doc(db, "tournaments", tournamentId));
+
+            await batch.commit();
+
+            alert("Tournament deleted successfully");
+
+            navigate("/");
+
+        } catch (err) {
+            console.error(err);
+            alert("Failed to delete tournament");
+        }
+    };
 
     if (loading) {
         return (
@@ -488,6 +553,15 @@ const TournamentDetailsPage = () => {
                     >
                         Undo Knockout
                     </button>
+                    {/* tournament delete button */}
+                    {userRole === "admin" && (
+                        <button
+                            onClick={handleDeleteTournament}
+                            className="w-full mt-4 py-2 bg-red-600 text-white rounded-lg"
+                        >
+                            Delete Tournament
+                        </button>
+                    )}
 
                     {/* knockout matches ui */}
 

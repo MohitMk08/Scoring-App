@@ -10,7 +10,8 @@ import {
     collection,
     increment,
     setDoc,
-    deleteDoc
+    deleteDoc,
+    addDoc // ✅ added
 } from "firebase/firestore";
 import { db, auth } from "../../firebase";
 import { useParams, useNavigate } from "react-router-dom";
@@ -57,7 +58,6 @@ const MatchLivePage = () => {
         };
     }, [matchId, user]);
 
-    // 🔥 STOP until match exists
     if (loading) return <div>Loading...</div>;
     if (!match) return <div>Match not found</div>;
 
@@ -66,12 +66,28 @@ const MatchLivePage = () => {
     const currentSetIndex = (match.currentSet ?? 1) - 1;
     const sets = match.sets ?? [{ teamA: 0, teamB: 0 }];
 
+    // ✅ Match label helper
+    const getMatchLabel = () => {
+        if (!match?.tournamentId) return null;
+
+        if (match.stage === "league") {
+            return `League Match #${match.matchNumber || ""}`;
+        }
+
+        if (match.round === "semifinal") return "Semi Final";
+        if (match.round === "final") return "Final";
+        if (match.round === "third_place") return "3rd Place Match";
+
+        return "";
+    };
+
     // 🔹 Start match
     const startMatch = async () => {
         await updateDoc(doc(db, "matches", matchId), {
             status: "live",
             currentSet: 1,
             sets: [{ teamA: 0, teamB: 0 }],
+            history: [], // ✅ added
             startedAt: Timestamp.now(),
         });
     };
@@ -108,12 +124,19 @@ const MatchLivePage = () => {
         });
     };
 
-    // 🔹 Update score
+    // 🔹 Update score (history added)
     const updateScore = async (team) => {
         if (match.status !== "live") return;
 
         const updatedSets = [...sets];
+        const history = match.history ?? [];
+
         updatedSets[currentSetIndex][team] += 1;
+
+        history.push({
+            team,
+            setIndex: currentSetIndex
+        });
 
         const a = updatedSets[currentSetIndex].teamA;
         const b = updatedSets[currentSetIndex].teamB;
@@ -131,6 +154,7 @@ const MatchLivePage = () => {
 
                 await updateDoc(doc(db, "matches", matchId), {
                     sets: updatedSets,
+                    history,
                     status: "finished",
                     winnerTeamId: winnerId,
                     finishedAt: Timestamp.now(),
@@ -145,6 +169,7 @@ const MatchLivePage = () => {
 
             await updateDoc(doc(db, "matches", matchId), {
                 sets: updatedSets,
+                history,
                 currentSet: match.currentSet + 1,
             });
 
@@ -153,28 +178,34 @@ const MatchLivePage = () => {
 
         await updateDoc(doc(db, "matches", matchId), {
             sets: updatedSets,
+            history,
         });
     };
 
-    // 🔹 Undo
+    // 🔹 Undo FIXED
     const undoLastPoint = async () => {
         if (match.status !== "live") return;
 
+        const history = match.history ?? [];
+        if (history.length === 0) return;
+
+        const last = history[history.length - 1];
+        const updatedHistory = history.slice(0, -1);
+
         const updatedSets = [...sets];
 
-        if (updatedSets[currentSetIndex].teamA > 0) {
-            updatedSets[currentSetIndex].teamA -= 1;
-        } else if (updatedSets[currentSetIndex].teamB > 0) {
-            updatedSets[currentSetIndex].teamB -= 1;
+        if (updatedSets[last.setIndex][last.team] > 0) {
+            updatedSets[last.setIndex][last.team] -= 1;
         }
 
         await updateDoc(doc(db, "matches", matchId), {
             sets: updatedSets,
+            history: updatedHistory,
         });
     };
 
+    // 🔹 Final match creation (unchanged)
     const checkAndCreateFinalMatches = async () => {
-
         const q = query(
             collection(db, "matches"),
             where("tournamentId", "==", match.tournamentId),
@@ -204,50 +235,82 @@ const MatchLivePage = () => {
         const sf2Loser =
             sf2Winner === sf2.teamAId ? sf2.teamBId : sf2.teamAId;
 
-        // FINAL MATCH
         await addDoc(collection(db, "matches"), {
             tournamentId: match.tournamentId,
             round: "final",
-
             teamAId: sf1Winner,
             teamAName: sf1Winner === sf1.teamAId ? sf1.teamAName : sf1.teamBName,
-
             teamBId: sf2Winner,
             teamBName: sf2Winner === sf2.teamAId ? sf2.teamAName : sf2.teamBName,
-
             status: "upcoming",
             sets: [],
             currentSet: 1,
             totalSets: 5,
-
             createdAt: Timestamp.now()
         });
 
-        // THIRD PLACE MATCH
         await addDoc(collection(db, "matches"), {
             tournamentId: match.tournamentId,
             round: "third_place",
-
             teamAId: sf1Loser,
             teamAName: sf1Loser === sf1.teamAId ? sf1.teamAName : sf1.teamBName,
-
             teamBId: sf2Loser,
             teamBName: sf2Loser === sf2.teamAId ? sf2.teamAName : sf2.teamBName,
-
             status: "upcoming",
             sets: [],
             currentSet: 1,
             totalSets: 3,
-
             createdAt: Timestamp.now()
+        });
+    };
+
+    // reset match logic
+    const resetMatch = async () => {
+        if (match.status === "finished") {
+            alert("Cannot reset a finished match");
+            return;
+        }
+
+        const confirmReset = window.confirm(
+            "Reset this match? All scores will be lost."
+        );
+        if (!confirmReset) return;
+
+        await updateDoc(doc(db, "matches", matchId), {
+            status: "upcoming",
+
+            currentSet: 1,
+            sets: [],
+
+            winnerTeamId: null,
+            finishedAt: null,
+            startedAt: null,
         });
     };
 
     return (
         <div className="max-w-xl mx-auto p-4 space-y-4 bg-white rounded-xl shadow">
             <h1 className="text-xl font-bold text-red-500">Live Match</h1>
+            {match.status === "live" && (
+                <div className="flex justify-center items-center gap-2">
+                    <span className="h-3 w-3 rounded-full bg-red-500 animate-ping"></span>
+                    <span className="text-red-500 font-semibold text-sm">LIVE</span>
+                </div>
+            )}
+            {/* ✅ ADDED tournament info */}
+            {match.tournamentName && (
+                <p className="text-sm font-semibold text-indigo-600 text-center">
+                    {match.tournamentName}
+                </p>
+            )}
 
-            {/* ✅ COMPLETED SETS SUMMARY BLOCK (ADDED) */}
+            {getMatchLabel() && (
+                <p className="text-xs text-gray-500 text-center">
+                    {getMatchLabel()}
+                </p>
+            )}
+
+            {/* Completed Sets */}
             {sets.length > 1 && (
                 <div className="bg-gray-100 p-3 rounded-lg space-y-2">
                     <h2 className="font-semibold text-gray-700">Completed Sets</h2>
@@ -260,14 +323,9 @@ const MatchLivePage = () => {
                                     : null;
 
                         return (
-                            <div
-                                key={index}
-                                className="flex justify-between text-sm border-b pb-1"
-                            >
+                            <div key={index} className="flex justify-between text-sm border-b pb-1">
                                 <span>Set {index + 1}</span>
-                                <span>
-                                    {set.teamA} : {set.teamB}
-                                </span>
+                                <span>{set.teamA} : {set.teamB}</span>
                                 {winner && (
                                     <span className="text-green-600 font-medium">
                                         {winner}
@@ -341,6 +399,22 @@ const MatchLivePage = () => {
                     className="w-full py-2 bg-yellow-500 text-white rounded-lg"
                 >
                     Undo Last Point
+                </button>
+            )}
+            {match.status === "live" && (
+                <button
+                    onClick={resetMatch}
+                    className="w-full py-2 bg-red-600 text-white rounded-lg"
+                >
+                    Reset Match
+                </button>
+            )}
+            {match.status === "finished" && match.tournamentId && (
+                <button
+                    onClick={() => navigate(`/tournaments/${match.tournamentId}`)}
+                    className="w-full py-2 bg-indigo-600 text-white rounded-lg"
+                >
+                    View Tournament Details
                 </button>
             )}
         </div>

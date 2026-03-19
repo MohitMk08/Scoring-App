@@ -43,7 +43,7 @@ const MatchBox = ({ match, title }) => {
 
             {match && (
                 <button
-                    onClick={() => navigate(`/match/${match.id}`)}
+                    onClick={() => navigate(`/matches/live/${match.id}`)}
                     className="mt-3 w-full bg-indigo-600 text-white py-1 rounded-lg text-sm"
                 >
                     {match.status === "finished" ? "View" : match.status === "live" ? "Resume" : "Start"}

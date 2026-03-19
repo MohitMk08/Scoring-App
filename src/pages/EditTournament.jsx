@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { doc, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import { db } from "../firebase";
-import DashboardLayout from "../layout/DashboardLayout";
 import toast from "react-hot-toast";
 
 export default function EditTournament() {

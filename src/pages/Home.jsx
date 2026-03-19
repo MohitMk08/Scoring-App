@@ -5,7 +5,8 @@ import {
     where,
     onSnapshot,
     doc,
-    getDoc
+    getDoc,
+    getDocs
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { useNavigate } from "react-router-dom";
