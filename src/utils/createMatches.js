@@ -69,7 +69,11 @@ export const createMatches = async (tournamentId, teams, format) => {
                     teamBLogo: teams[j].logoUrl || "",
 
                     status: "upcoming",
+
+                    // 🔥 NEW CONFIG
                     totalSets: 3,
+                    pointsPerSet: 25,
+                    lastSetPoints: 15,
 
                     currentSet: 1,
                     sets: [],
@@ -78,7 +82,6 @@ export const createMatches = async (tournamentId, teams, format) => {
                     createdAt: Timestamp.now(),
                 });
 
-                // 🔁 Double round robin reverse match
                 if (format === "double-round-robin") {
                     await addDoc(matchesRef, {
                         tournamentId,
@@ -97,7 +100,11 @@ export const createMatches = async (tournamentId, teams, format) => {
                         teamBLogo: teams[i].logoUrl || "",
 
                         status: "upcoming",
+
+                        // 🔥 NEW CONFIG
                         totalSets: 3,
+                        pointsPerSet: 25,
+                        lastSetPoints: 15,
 
                         currentSet: 1,
                         sets: [],
@@ -116,6 +123,8 @@ export const createMatches = async (tournamentId, teams, format) => {
     ============================= */
     if (format === "knockout") {
         const shuffled = [...teams].sort(() => Math.random() - 0.5);
+
+        stage: "knockout";
 
         let roundName = "";
 
@@ -138,14 +147,18 @@ export const createMatches = async (tournamentId, teams, format) => {
 
                 teamAId: shuffled[i].id,
                 teamAName: shuffled[i].name,
-                teamALogo: teams[i].logoUrl || "",   // ✅ ADD THIS
+                teamALogo: shuffled[i].logoUrl || "",   // ✅ FIXED
 
                 teamBId: shuffled[i + 1].id,
                 teamBName: shuffled[i + 1].name,
-                teamBLogo: teams[j].logoUrl || "",   // ✅ ADD THIS
+                teamBLogo: shuffled[i + 1].logoUrl || "",   // ✅ FIXED
 
                 status: "upcoming",
+
+                // 🔥 IMPORTANT (DEFAULT)
                 totalSets: 3,
+                pointsPerSet: 25,
+                lastSetPoints: 15,
 
                 currentSet: 1,
                 sets: [],
