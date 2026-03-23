@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
     doc,
     updateDoc,
@@ -23,11 +23,17 @@ const MatchLivePage = () => {
     const [match, setMatch] = useState(null);
     const [loading, setLoading] = useState(true);
     const [scorePulse, setScorePulse] = useState(false);
+    const [activeTimeout, setActiveTimeout] = useState(null);
 
     const [timeout, setTimeoutState] = useState({
         team: null,
         remaining: 0
     });
+    const [timeoutData, setTimeoutData] = useState(null);
+    const [timeoutLeft, setTimeoutLeft] = useState(0);
+    const [activeTimeoutTeam, setActiveTimeoutTeam] = useState(null);
+    const tickAudioRef = useRef(null);
+    const whistleAudioRef = useRef(null);
 
     const user = auth.currentUser;
 
@@ -69,6 +75,65 @@ const MatchLivePage = () => {
         return () => clearInterval(interval);
     }, [timeout.remaining]);
 
+    // init audio
+    useEffect(() => {
+        tickAudioRef.current = new Audio("/tick.mp3");
+        whistleAudioRef.current = new Audio("/refree-whistle-long.mp3");
+
+        tickAudioRef.current.preload = "auto";
+        whistleAudioRef.current.preload = "auto";
+    }, []);
+
+    // ✅ FIXED: Proper timeout sync + auto clear
+    useEffect(() => {
+        if (!match?.timeout) {
+            setTimeoutLeft(0);
+            setActiveTimeoutTeam(null);
+            setActiveTimeout(null);
+            return;
+        }
+
+        setActiveTimeout(match.timeout.team);
+
+        const interval = setInterval(async () => {
+            const now = Date.now();
+            const end = match.timeout?.endsAt?.toMillis?.();
+
+            if (!end) return;
+
+            const remaining = Math.max(0, Math.floor((end - now) / 1000));
+
+            setTimeoutLeft(remaining);
+            setActiveTimeoutTeam(match.timeout.team);
+
+            if (remaining > 0) {
+                try {
+                    tickAudioRef.current.currentTime = 0;
+                    tickAudioRef.current.play();
+
+                    navigator.vibrate?.(100);
+                } catch { }
+            }
+
+            if (remaining === 0) {
+                clearInterval(interval);
+
+                try {
+                    whistleAudioRef.current.play();
+
+                    // 🔥 strong vibration pattern
+                    navigator.vibrate?.([300, 100, 300, 100, 500]);
+                } catch { }
+
+                await updateDoc(doc(db, "matches", matchId), {
+                    timeout: null
+                });
+            }
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [match?.timeout]);
+
     if (loading) return <div>Loading...</div>;
     if (!match) return <div>Match not found</div>;
 
@@ -105,14 +170,9 @@ const MatchLivePage = () => {
 
     /* ---------------- SET SELECTION ---------------- */
     const updateMatchSets = async (matchId, sets) => {
-
-        if (!matchId) {
-            console.error("Match ID missing");
-            return;
-        }
+        if (!matchId) return;
 
         try {
-            // 🔥 instant UI update
             setMatch(prev => ({
                 ...prev,
                 totalSets: sets,
@@ -120,11 +180,11 @@ const MatchLivePage = () => {
                 lastSetPoints: sets === 5 ? 15 : 25
             }));
 
-            // 🔥 DB update
+            // ✅ FIX: removed wrong timeout object
             await updateDoc(doc(db, "matches", matchId), {
                 totalSets: sets,
                 pointsPerSet: 25,
-                lastSetPoints: sets === 5 ? 15 : 25,
+                lastSetPoints: sets === 5 ? 15 : 25
             });
 
         } catch (err) {
@@ -144,14 +204,39 @@ const MatchLivePage = () => {
     };
 
     /* ---------------- TIMEOUT ---------------- */
-    const startTimeout = (team) => {
-        if (timeout.remaining > 0) return;
+    const startTimeout = async (team) => {
+        if (match.status !== "live") return;
 
-        setTimeoutState({
-            team,
-            remaining: 60
+        const currentSet = match.currentSet || 1;
+
+        const timeoutData = match.timeout || {
+            used: { teamA: 0, teamB: 0 }
+        };
+
+        const used = timeoutData.used || { teamA: 0, teamB: 0 };
+
+        if (used[team] >= 2 && timeoutData.setNumber === currentSet) {
+            alert("Timeout limit reached (2 per set)");
+            return;
+        }
+
+        const endsAt = Timestamp.fromMillis(Date.now() + 60000);
+
+        await updateDoc(doc(db, "matches", matchId), {
+            timeout: {
+                team,
+                endsAt,
+                setNumber: currentSet,
+                used: {
+                    ...used,
+                    [team]: (used[team] || 0) + 1
+                }
+            }
         });
     };
+
+    const isScoringDisabled =
+        match.status !== "live" || activeTimeout !== null;
 
     /* ---------------- SCORE ---------------- */
     const updateScore = async (team) => {
@@ -161,6 +246,12 @@ const MatchLivePage = () => {
         setTimeout(() => setScorePulse(false), 200);
 
         const updatedSets = [...sets];
+
+        // ✅ FIX: safe set init
+        if (!updatedSets[currentSetIndex - 1]) {
+            updatedSets[currentSetIndex - 1] = { teamA: 0, teamB: 0 };
+        }
+
         const history = match.history ?? [];
 
         updatedSets[currentSetIndex - 1][team] += 1;
@@ -191,9 +282,11 @@ const MatchLivePage = () => {
                     status: "finished",
                     winnerTeamId: winnerId,
                     finishedAt: Timestamp.now(),
+                    timeout: null,
                 });
 
                 await checkAndCreateFinalMatches();
+                await checkAndCompleteTournament(); // ✅ NEW
 
                 return;
             }
@@ -205,9 +298,6 @@ const MatchLivePage = () => {
                 history,
                 currentSet: match.currentSet + 1,
             });
-
-
-
             return;
         }
 
@@ -215,110 +305,6 @@ const MatchLivePage = () => {
             sets: updatedSets,
             history,
         });
-    };
-
-    // final match creation 
-
-    const checkAndCreateFinalMatches = async () => {
-        try {
-            const q = query(
-                collection(db, "matches"),
-                where("tournamentId", "==", match.tournamentId),
-                where("round", "==", "semifinal")
-            );
-
-            const snap = await getDocs(q);
-
-            const semifinals = snap.docs.map(d => ({
-                id: d.id,
-                ...d.data()
-            }));
-
-            const finished = semifinals.filter(m => m.status === "finished");
-            if (finished.length !== 2) return;
-
-            // 🚫 Prevent duplicate creation
-            const existingQ = query(
-                collection(db, "matches"),
-                where("tournamentId", "==", match.tournamentId),
-                where("round", "in", ["final", "third_place"])
-            );
-
-            const existingSnap = await getDocs(existingQ);
-            if (!existingSnap.empty) return;
-
-            const sf1 = semifinals.find(m => m.matchNumber === 1);
-            const sf2 = semifinals.find(m => m.matchNumber === 2);
-
-            if (!sf1 || !sf2) return;
-
-            const getName = (id, m) =>
-                id === m.teamAId ? m.teamAName : m.teamBName;
-
-            const sf1Winner = sf1.winnerTeamId;
-            const sf2Winner = sf2.winnerTeamId;
-
-            const sf1Loser =
-                sf1Winner === sf1.teamAId ? sf1.teamBId : sf1.teamAId;
-
-            const sf2Loser =
-                sf2Winner === sf2.teamAId ? sf2.teamBId : sf2.teamAId;
-
-            // 🏆 FINAL
-            await addDoc(collection(db, "matches"), {
-                tournamentId: match.tournamentId,
-                tournamentName: match.tournamentName || "",
-
-                stage: "knockout",
-                round: "final",
-
-                teamAId: sf1Winner,
-                teamAName: getName(sf1Winner, sf1),
-
-                teamBId: sf2Winner,
-                teamBName: getName(sf2Winner, sf2),
-
-                status: "upcoming",
-                totalSets: 3,
-                pointsPerSet: 25,
-                lastSetPoints: 15,
-
-                currentSet: 1,
-                sets: [],
-                history: [],
-
-                createdAt: Timestamp.now(),
-            });
-
-            // 🥉 THIRD PLACE
-            await addDoc(collection(db, "matches"), {
-                tournamentId: match.tournamentId,
-                tournamentName: match.tournamentName || "",
-
-                stage: "knockout",
-                round: "third_place",
-
-                teamAId: sf1Loser,
-                teamAName: getName(sf1Loser, sf1),
-
-                teamBId: sf2Loser,
-                teamBName: getName(sf2Loser, sf2),
-
-                status: "upcoming",
-                totalSets: 3,
-                pointsPerSet: 25,
-                lastSetPoints: 15,
-
-                currentSet: 1,
-                sets: [],
-                history: [],
-
-                createdAt: Timestamp.now(),
-            });
-
-        } catch (err) {
-            console.error("Final creation error:", err);
-        }
     };
 
     /* ---------------- UNDO ---------------- */
@@ -333,6 +319,9 @@ const MatchLivePage = () => {
 
         const updatedSets = [...sets];
 
+        // ✅ FIX: safe check (prevents crash / blank UI)
+        if (!updatedSets[last.setIndex]) return;
+
         if (updatedSets[last.setIndex][last.team] > 0) {
             updatedSets[last.setIndex][last.team] -= 1;
         }
@@ -341,6 +330,33 @@ const MatchLivePage = () => {
             sets: updatedSets,
             history: updatedHistory,
         });
+    };
+
+    /* ---------------- AUTO COMPLETE TOURNAMENT ---------------- */
+    const checkAndCompleteTournament = async () => {
+        if (!match?.tournamentId) return;
+
+        try {
+            const q = query(
+                collection(db, "matches"),
+                where("tournamentId", "==", match.tournamentId)
+            );
+
+            const snap = await getDocs(q);
+            const matches = snap.docs.map(d => d.data());
+
+            const allFinished = matches.every(m => m.status === "finished");
+
+            if (!allFinished) return;
+
+            await updateDoc(doc(db, "tournaments", match.tournamentId), {
+                status: "completed",
+                completedAt: Timestamp.now()
+            });
+
+        } catch (err) {
+            console.error("Tournament completion error:", err);
+        }
     };
 
     /* ---------------- RESET ---------------- */
@@ -352,12 +368,14 @@ const MatchLivePage = () => {
         await updateDoc(doc(db, "matches", matchId), {
             status: "upcoming",
             currentSet: 1,
-            sets: [],
+            sets: [{ teamA: 0, teamB: 0 }],
             winnerTeamId: null,
             finishedAt: null,
             startedAt: null,
+            timeout: null // ✅ FIX
         });
     };
+
 
     return (
         <div className="max-w-xl mx-auto p-4 space-y-4 bg-white rounded-xl shadow">
@@ -434,46 +452,133 @@ const MatchLivePage = () => {
                 </>
             )}
 
+            {/* 🔥 TIMEOUT INDICATOR */}
+            {activeTimeout && (
+                <div className="text-center text-sm font-semibold text-orange-600 bg-orange-100 py-2 rounded-lg animate-pulse">
+                    ⏱ Timeout - {activeTimeout === "teamA" ? match.teamAName : match.teamBName}
+                </div>
+            )}
+
             {/* LIVE */}
             {match.status !== "upcoming" && (
                 <>
-                    <div className="flex justify-between">
-                        <span>{match.teamAName}</span>
-                        <span>Set {match.currentSet}</span>
-                        <span>{match.teamBName}</span>
-                    </div>
+                    <div className="max-w-xl mx-auto p-4 space-y-4 bg-white rounded-xl shadow relative">
 
-                    <div className="flex justify-between items-center">
-                        <button onClick={() => updateScore("teamA")} className="bg-indigo-600 text-white px-6 py-3 rounded">+1</button>
+                        {timeoutLeft > 0 && (
+                            <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+                                <div className="text-center text-white animate-pulse">
+                                    <div className="text-6xl mb-2">⏱️</div>
 
-                        <div className={`text-3xl font-bold ${scorePulse ? "scale-110 text-indigo-600" : ""}`}>
-                            {sets[currentSetIndex - 1]?.teamA} :
-                            {sets[currentSetIndex - 1]?.teamB}
+                                    <h2 className="text-xl font-bold">
+                                        {activeTimeoutTeam === "teamA"
+                                            ? match.teamAName
+                                            : match.teamBName} Timeout
+                                    </h2>
+
+                                    <p className={`
+    font-bold mt-2 transition-all duration-300
+    ${timeoutLeft <= 3
+                                            ? "text-[120px] scale-150 text-red-500 animate-bounce"
+                                            : timeoutLeft <= 5
+                                                ? "text-8xl scale-125 text-red-400"
+                                                : "text-6xl"}
+`}>
+                                        {timeoutLeft}s
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="flex justify-between">
+                            <span>{match.teamAName}</span>
+                            <span>Set {match.currentSet}</span>
+                            <span>{match.teamBName}</span>
                         </div>
 
-                        <button onClick={() => updateScore("teamB")} className="bg-indigo-600 text-white px-6 py-3 rounded">+1</button>
-                    </div>
+                        <div className="flex justify-between items-center">
+                            <button
+                                disabled={isScoringDisabled || timeoutLeft > 0}
+                                onClick={() => updateScore("teamA")}
+                                className={`px-6 py-3 rounded-lg text-white ${isScoringDisabled
+                                    ? "bg-gray-300 cursor-not-allowed"
+                                    : "bg-indigo-600 hover:bg-indigo-700"
+                                    }`}
+                            >
+                                +1
+                            </button>
 
-                    {/* TIMEOUT */}
-                    <div className="flex gap-2 mt-2">
-                        <button onClick={() => startTimeout("teamA")} className="flex-1 bg-blue-500 text-white py-2 rounded">
-                            {timeout.team === "teamA" && timeout.remaining > 0
-                                ? `${timeout.remaining}s`
-                                : `${match.teamAName} TO`}
-                        </button>
+                            <div className={`text-3xl font-bold ${scorePulse ? "scale-110 text-indigo-600" : ""}`}>
+                                {sets[currentSetIndex - 1]?.teamA} :
+                                {sets[currentSetIndex - 1]?.teamB}
+                            </div>
 
-                        <button onClick={() => startTimeout("teamB")} className="flex-1 bg-purple-500 text-white py-2 rounded">
-                            {timeout.team === "teamB" && timeout.remaining > 0
-                                ? `${timeout.remaining}s`
-                                : `${match.teamBName} TO`}
-                        </button>
+                            <button
+                                disabled={isScoringDisabled || timeoutLeft > 0}
+                                onClick={() => updateScore("teamB")}
+                                className={`px-6 py-3 rounded-lg text-white ${isScoringDisabled
+                                    ? "bg-gray-300 cursor-not-allowed"
+                                    : "bg-indigo-600 hover:bg-indigo-700"
+                                    }`}
+                            >
+                                +1
+                            </button>
+                        </div>
+
+                        {/* TIMEOUT */}
+                        {/* <div className="flex gap-2 mt-2">
+                            <button
+                                disabled={match.status !== "live" || activeTimeout !== null}
+                                onClick={() => startTimeout("teamA")}
+                                className={`px-3 py-2 rounded-lg text-xs ${match.status !== "live" || activeTimeout
+                                    ? "bg-gray-300 cursor-not-allowed flex-1 py-2 rounded font-bold"
+                                    : "bg-orange-500 text-white flex-1 py-2 rounded font-bold"
+                                    }`}
+                            >
+                                {timeout.team === "teamA" && timeout.remaining > 0
+                                    ? `${timeout.remaining}s`
+                                    : `${match.teamAName} ⏱`}
+                            </button>
+
+                            <button
+                                disabled={match.status !== "live" || activeTimeout !== null}
+                                onClick={() => startTimeout("teamB")}
+                                className={`px-3 py-2 rounded-lg text-xs ${match.status !== "live" || activeTimeout
+                                    ? "bg-gray-300 cursor-not-allowed flex-1 py-2 rounded font-bold"
+                                    : "bg-orange-500 text-white flex-1 py-2 rounded font-bold"
+                                    }`}
+                            >
+                                {timeout.team === "teamB" && timeout.remaining > 0
+                                    ? `${timeout.remaining}s`
+                                    : `${match.teamBName} ⏱`}
+                            </button>
+                        </div> */}
                     </div>
                 </>
             )}
 
             {match.status === "live" && (
+                <div className="flex gap-2 mt-2">
+                    <button
+                        onClick={() => startTimeout("teamA")}
+                        disabled={timeoutLeft > 0}
+                        className="flex-1 py-2 bg-blue-500 text-white rounded-lg"
+                    >
+                        {match.teamAName} Timeout
+                    </button>
+
+                    <button
+                        onClick={() => startTimeout("teamB")}
+                        disabled={timeoutLeft > 0}
+                        className="flex-1 py-2 bg-purple-500 text-white rounded-lg"
+                    >
+                        {match.teamBName} Timeout
+                    </button>
+                </div>
+            )}
+
+            {match.status === "live" && (
                 <>
-                    <button onClick={undoLastPoint} className="w-full bg-yellow-500 text-white py-2 rounded">Undo</button>
+                    <button onClick={undoLastPoint} className="w-full bg-yellow-500 text-white py-2 rounded">Undo Last Point</button>
                     <button onClick={resetMatch} className="w-full bg-red-600 text-white py-2 rounded">Reset</button>
                 </>
             )}

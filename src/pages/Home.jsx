@@ -281,7 +281,7 @@ export default function Home({ user }) {
                         return (
                             <div
                                 key={m.id}
-                                onClick={() => navigate(`/matches/${m.id}`)}
+                                onClick={() => navigate(`/matches/live/${m.id}`)}
                                 className="bg-white rounded-xl p-3 sm:p-4 shadow space-y-3 hover:shadow-md transition cursor-pointer"
                             >
                                 {/* Tournament + Date */}
